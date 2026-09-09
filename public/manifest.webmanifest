@@ -1,0 +1,14 @@
+{
+  "name": "词忆 CET · 四六级词汇记忆",
+  "short_name": "词忆CET",
+  "description": "基于间隔重复的四六级词汇长期记忆工具",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f7",
+  "theme_color": "#3d8f6a",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

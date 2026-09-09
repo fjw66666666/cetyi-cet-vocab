@@ -1,0 +1,32 @@
+{
+  "books": {
+    "CET4": {
+      "shards": [
+        "cet4-0.json",
+        "cet4-1.json",
+        "cet4-2.json",
+        "cet4-3.json",
+        "cet4-4.json",
+        "cet4-5.json",
+        "cet4-6.json",
+        "cet4-7.json",
+        "cet4-8.json",
+        "cet4-9.json"
+      ],
+      "count": 4545
+    },
+    "CET6": {
+      "shards": [
+        "cet6-0.json",
+        "cet6-1.json",
+        "cet6-2.json",
+        "cet6-3.json",
+        "cet6-4.json",
+        "cet6-5.json",
+        "cet6-6.json",
+        "cet6-7.json"
+      ],
+      "count": 3998
+    }
+  }
+}
