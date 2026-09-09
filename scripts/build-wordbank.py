@@ -18,7 +18,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT.parent / "wordbank-src"
+SRC = ROOT / "scripts" / "source"
 DATA = ROOT / "public" / "data"
 SHARD_SIZE = 600
 FREQ_T0_RANK = 4000      # tier0 补充词池上限（取前 ~148 个凑满 200）
