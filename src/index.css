@@ -4,65 +4,69 @@
 
 @layer base {
   :root {
-    --background: 105 9% 97%;
-    --foreground: 150 8% 11%;
+    --background: 210 29% 97%;
+    --foreground: 224 39% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 150 8% 11%;
+    --card-foreground: 224 39% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 150 8% 11%;
-    --primary: 152 40% 36%;
-    --primary-foreground: 120 30% 97%;
-    --secondary: 120 6% 93%;
-    --secondary-foreground: 150 8% 16%;
-    --muted: 120 6% 93%;
-    --muted-foreground: 140 4% 44%;
-    --accent: 84 74% 79%;
-    --accent-foreground: 150 8% 11%;
+    --popover-foreground: 224 39% 11%;
+    --primary: 200 98% 32%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 25% 92%;
+    --secondary-foreground: 224 30% 16%;
+    --muted: 214 25% 92%;
+    --muted-foreground: 218 12% 42%;
+    --accent: 199 89% 88%;
+    --accent-foreground: 224 39% 11%;
     --destructive: 6 63% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 130 6% 88%;
-    --input: 130 6% 88%;
-    --ring: 152 40% 36%;
+    --border: 214 20% 87%;
+    --input: 214 20% 87%;
+    --ring: 200 98% 32%;
     --radius: 0.75rem;
+    /* 科技感渐变三色：电子蓝 → 紫 → 青绿 */
+    --grad-a: 198.6 93.2% 59.8%; /* #38BDF8 */
+    --grad-b: 258.3 89.7% 66.3%; /* #8B5CF6 */
+    --grad-c: 172.5 66.1% 50.4%; /* #2DD4BF */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 200 98% 32%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 200 98% 32%;
   }
 
   .dark {
-    --background: 140 5% 7%;
-    --foreground: 105 9% 95%;
-    --card: 140 5% 10%;
-    --card-foreground: 105 9% 95%;
-    --popover: 140 5% 10%;
-    --popover-foreground: 105 9% 95%;
-    --primary: 152 42% 58%;
-    --primary-foreground: 150 8% 11%;
-    --secondary: 140 4% 16%;
-    --secondary-foreground: 105 9% 92%;
-    --muted: 140 4% 16%;
-    --muted-foreground: 130 4% 62%;
-    --accent: 84 50% 38%;
-    --accent-foreground: 105 9% 95%;
-    --destructive: 6 55% 48%;
+    --background: 225 44% 7%; /* 深空 #0A0E1A */
+    --foreground: 213 30% 95%;
+    --card: 223 34% 10%;
+    --card-foreground: 213 30% 95%;
+    --popover: 223 34% 10%;
+    --popover-foreground: 213 30% 95%;
+    --primary: 198.6 93.2% 59.8%; /* 电子蓝 #38BDF8 */
+    --primary-foreground: 222 60% 10%;
+    --secondary: 221 27% 16%;
+    --secondary-foreground: 213 25% 90%;
+    --muted: 221 27% 16%;
+    --muted-foreground: 215 18% 70%;
+    --accent: 200 60% 22%;
+    --accent-foreground: 213 30% 95%;
+    --destructive: 6 55% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 140 4% 18%;
-    --input: 140 4% 18%;
-    --ring: 152 42% 58%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
+    --border: 220 26% 18%;
+    --input: 220 26% 18%;
+    --ring: 198.6 93.2% 59.8%;
+    --sidebar-background: 223 34% 10%;
+    --sidebar-foreground: 213 30% 95%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 221 27% 16%;
+    --sidebar-accent-foreground: 213 30% 95%;
+    --sidebar-border: 220 26% 18%;
+    --sidebar: 223 34% 10%;
+    --sidebar-ring: 198.6 93.2% 59.8%;
   }
 }
 
@@ -76,7 +80,7 @@
   body {
     @apply bg-background text-foreground;
     font-family:
-      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
       'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   }
 }
@@ -89,6 +93,141 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
+  /* ---------- 科技感视觉层（动画仅用 transform/opacity/box-shadow） ---------- */
+
+  /* 玻璃拟态卡片：半透明 + 背景模糊 + 1px 渐变描边 */
+  .glass-card {
+    position: relative;
+    background: color-mix(in srgb, hsl(var(--card)) 78%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgb(2 6 23 / 0.18);
+  }
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      hsl(var(--grad-a) / 0.45),
+      hsl(var(--grad-b) / 0.3) 50%,
+      hsl(var(--grad-c) / 0.4)
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* 渐变霓虹文字 */
+  .neon-text {
+    background: linear-gradient(120deg, hsl(var(--grad-a)), hsl(var(--grad-b)) 55%, hsl(var(--grad-c)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 发光描边（聚焦/高亮） */
+  .glow-ring {
+    box-shadow:
+      0 0 0 1px hsl(var(--grad-a) / 0.55),
+      0 0 18px hsl(var(--grad-a) / 0.35),
+      0 0 42px hsl(var(--grad-a) / 0.12);
+  }
+
+  /* hover 上浮 + 微光 */
+  .hover-lift {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgb(2 6 23 / 0.22), 0 0 24px hsl(var(--grad-a) / 0.18);
+  }
+
+  /* 答对霓虹脉冲（替代原有 pop 的强化版，仍 <400ms） */
+  @keyframes pulse-neon {
+    0% { box-shadow: 0 0 0 0 hsl(var(--grad-a) / 0.5); }
+    70% { box-shadow: 0 0 0 14px hsl(var(--grad-a) / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--grad-a) / 0); }
+  }
+  .animate-pulse-neon {
+    animation: pulse-neon 0.4s ease-out;
+  }
+
+  /* 路由切换淡入滑动 */
+  @keyframes fade-slide {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-slide {
+    animation: fade-slide 0.26s ease-out;
+  }
+
+  /* 极光背景：ambient 慢速漂移 */
+  @keyframes aurora-drift {
+    0% { transform: translate3d(-6%, -4%, 0) scale(1) rotate(0deg); opacity: 0.75; }
+    50% { transform: translate3d(5%, 6%, 0) scale(1.12) rotate(8deg); opacity: 1; }
+    100% { transform: translate3d(-6%, -4%, 0) scale(1) rotate(0deg); opacity: 0.75; }
+  }
+  .animate-aurora {
+    animation: aurora-drift 22s ease-in-out infinite;
+  }
+  @keyframes aurora-drift-alt {
+    0% { transform: translate3d(4%, 8%, 0) scale(1.08) rotate(0deg); opacity: 0.6; }
+    50% { transform: translate3d(-5%, -6%, 0) scale(1) rotate(-6deg); opacity: 0.9; }
+    100% { transform: translate3d(4%, 8%, 0) scale(1.08) rotate(0deg); opacity: 0.6; }
+  }
+  .animate-aurora-alt {
+    animation: aurora-drift-alt 28s ease-in-out infinite;
+  }
+  /* 漂浮粒子 */
+  @keyframes float-particle {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.35; }
+    50% { transform: translateY(-18px) scale(1.25); opacity: 0.7; }
+  }
+  .animate-float-particle {
+    animation: float-particle 7s ease-in-out infinite;
+  }
+
+  /* ---------- 降级策略 ---------- */
+  /* 移动端：降低模糊半径、隐藏粒子层（保留轻量渐变） */
+  @media (max-width: 768px) {
+    .glass-card {
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .aurora-particles {
+      display: none;
+    }
+    .animate-aurora,
+    .animate-aurora-alt {
+      animation-duration: 36s;
+    }
+  }
+  /* 无障碍：用户偏好减少动效时禁用全部新增动画 */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-neon,
+    .animate-fade-slide,
+    .animate-aurora,
+    .animate-aurora-alt,
+    .animate-float-particle {
+      animation: none;
+    }
+    .hover-lift,
+    .hover-lift:hover {
+      transform: none;
+      transition: none;
+    }
+    .glass-card {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
   /* 答错温和摇晃（<300ms） */
   @keyframes shake-soft {
     0%, 100% { transform: translateX(0); }

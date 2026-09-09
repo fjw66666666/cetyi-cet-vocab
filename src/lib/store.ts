@@ -19,7 +19,7 @@ function defaultState(): AppState {
     settings: {
       dailyNew: SRS_CONFIG.daily_new_default,
       voice: 'en-GB',
-      dark: 'auto',
+      dark: 'dark', // 默认深空主题（已有用户设置不受 load() 合并影响）
       notify: false,
       notifyHour: 20,
     },

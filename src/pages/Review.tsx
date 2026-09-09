@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft, CheckCircle2, Ear, Pencil, Type } from 'lucide-react';
 import { GradeButtons, SpeakerButton } from '@/components/ui-bits';
+import { HeatBadge } from '@/components/HeatBadge';
 import { useTodayQueue } from '@/hooks/useQueue';
 import { useWords } from '@/hooks/useWords';
 import { store, useAppState } from '@/lib/store';
+import { prioritizeDue } from '@/lib/priority';
 import { speak } from '@/lib/speech';
 import { WRONG_PASS_STREAK, XP_RULES } from '@/lib/config';
 import { cn } from '@/lib/utils';
@@ -85,8 +87,8 @@ export default function ReviewPage() {
   const navigate = useNavigate();
   const { due, bookWords } = useTodayQueue();
 
-  // 会话队列：due + 中途追加的「模糊/忘记」重测
-  const [queue, setQueue] = useState<string[]>(due);
+  // 会话队列：due（错词本 ∧ 热度 S/A 置顶）+ 中途追加的「模糊/忘记」重测
+  const [queue, setQueue] = useState<string[]>(() => prioritizeDue(due, state.records, all));
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState<'answering' | 'revealed'>('answering');
   const [picked, setPicked] = useState<string | null>(null);
@@ -194,7 +196,10 @@ export default function ReviewPage() {
 
       {/* 题干：先回忆，答案不可见 */}
       <div className="mt-8 flex flex-1 flex-col gap-6">
-        <div className="rounded-3xl border bg-card p-8 text-center">
+        <div className="relative rounded-3xl border bg-card p-8 text-center">
+          <div className="absolute right-3 top-3">
+            <HeatBadge fs={word.fs} tier={word.tier} size="sm" />
+          </div>
           {question.type === 'en2zh' && (
             <div className="space-y-3">
               <div className="font-word text-4xl font-bold tracking-tight">{word.word}</div>

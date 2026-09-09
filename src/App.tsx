@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useLocation } from 'react-router';
 import { BarChart3, BookOpenText, Home, Settings as SettingsIcon, Trophy } from 'lucide-react';
 import { WordsProvider } from '@/hooks/useWords';
 import { useTheme } from '@/hooks/useTheme';
+import { AuroraBackground } from '@/components/AuroraBackground';
 import { startNotifyLoop } from '@/lib/notify';
 import HomePage from '@/pages/Home';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,8 @@ function Shell() {
 
   return (
     <div className="min-h-screen">
+      {/* 极光氛围背景（纯装饰，不拦截交互） */}
+      <AuroraBackground />
       {/* 桌面顶栏 */}
       {!immersive && (
         <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
@@ -67,16 +70,19 @@ function Shell() {
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         }>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/learn" element={<LearnPage />} />
-          <Route path="/review" element={<ReviewPage />} />
-          <Route path="/listen" element={<ListenPage />} />
-          <Route path="/stats" element={<StatsPage />} />
-          <Route path="/achievements" element={<AchievementsPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        {/* 路由切换过渡：key=pathname 触发淡入滑动 */}
+        <div key={location.pathname} className="animate-fade-slide">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/learn" element={<LearnPage />} />
+            <Route path="/review" element={<ReviewPage />} />
+            <Route path="/listen" element={<ListenPage />} />
+            <Route path="/stats" element={<StatsPage />} />
+            <Route path="/achievements" element={<AchievementsPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
+        </div>
         </Suspense>
       </main>
 

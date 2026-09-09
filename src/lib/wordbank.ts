@@ -8,6 +8,7 @@ interface RawWord {
   us?: string;
   pos?: string;
   tier: 0 | 1 | 2;
+  fs?: number;
   meanings: string[];
   example?: { en: string; zh: string };
   mnemonic?: string;

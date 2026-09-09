@@ -1,14 +1,19 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { Flame, Headphones, Play, Sparkles } from 'lucide-react';
+import { Flame, Headphones, Play, Sparkles, Target } from 'lucide-react';
 import { ProgressRing, StatCard } from '@/components/ui-bits';
+import { GlassCard } from '@/components/GlassCard';
+import { CountUp } from '@/components/CountUp';
+import { HeatBadge } from '@/components/HeatBadge';
 import { useTodayQueue } from '@/hooks/useQueue';
 import { dateKey, useAppState } from '@/lib/store';
 import { learnedCount, masteredCount } from '@/lib/gamification';
+import { topFocusWords } from '@/lib/priority';
 import { SRS_CONFIG } from '@/lib/config';
 
 export default function HomePage() {
   const state = useAppState();
-  const { due, news, paused, total } = useTodayQueue();
+  const { due, news, paused, total, bookWords } = useTodayQueue();
   const today = state.days[dateKey()] ?? { newLearned: 0, reviewed: 0, correct: 0, wrong: 0, seconds: 0, xp: 0 };
   const goal = state.settings.dailyNew;
   const doneNew = today.newLearned;
@@ -18,14 +23,20 @@ export default function HomePage() {
   const progress = target > 0 ? Math.min(1, finished / target) : 0;
   const nothingToDo = due.length === 0 && news.length === 0;
 
+  // 每日重点词：热频 × 遗忘风险 Top 8
+  const focusWords = useMemo(
+    () => topFocusWords(bookWords, state.records, Date.now(), 8),
+    [bookWords, state.records],
+  );
+
   return (
     <div className="space-y-6">
       {/* 今日任务主卡 */}
-      <section className="rounded-3xl border bg-card p-6">
+      <GlassCard className="p-6">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-5">
             <ProgressRing value={progress} size={124}>
-              <div className="text-2xl font-semibold">{Math.round(progress * 100)}<span className="text-sm">%</span></div>
+              <div className="text-2xl font-semibold"><CountUp value={Math.round(progress * 100)} /><span className="text-sm">%</span></div>
               <div className="text-[11px] text-muted-foreground">今日进度</div>
             </ProgressRing>
             <div>
@@ -33,7 +44,7 @@ export default function HomePage() {
                 {state.activeBook} · 高频词 {SRS_CONFIG.daily_new_default === goal ? '优先' : ''}
               </div>
               <div className="mt-1 text-3xl font-semibold tracking-tight">
-                今日待复习 <span className="text-primary">{due.length}</span> 词
+                今日待复习 <CountUp value={due.length} className="neon-text font-mono" /> 词
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
                 {paused
@@ -67,19 +78,19 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-      </section>
+      </GlassCard>
 
       {/* 连胜 + 概览 */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="col-span-2 flex items-center gap-4 rounded-2xl border bg-card p-4">
+        <GlassCard className="col-span-2 flex items-center gap-4 p-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10">
             <Flame className="h-6 w-6 text-orange-500" />
           </div>
           <div>
-            <div className="text-2xl font-semibold">{state.streak.current} <span className="text-sm font-normal text-muted-foreground">天连续学习</span></div>
+            <div className="text-2xl font-semibold"><CountUp value={state.streak.current} className="font-mono" /> <span className="text-sm font-normal text-muted-foreground">天连续学习</span></div>
             <div className="text-xs text-muted-foreground">最长纪录 {state.streak.best} 天 · 今天{today.newLearned + today.reviewed > 0 ? '已打卡' : '未打卡'}</div>
           </div>
-        </div>
+        </GlassCard>
         <StatCard label="已学单词" value={learnedCount(state)} sub={`词书共 ${total} 词`} />
         <StatCard label="已掌握" value={masteredCount(state)} sub="间隔 ≥ 30 天或已斩" />
       </section>
@@ -94,6 +105,33 @@ export default function HomePage() {
         />
         <StatCard label="今日用时" value={`${Math.floor(today.seconds / 60)} 分钟`} />
       </section>
+
+      {/* 每日重点词：热频 × 遗忘风险 */}
+      {focusWords.length > 0 && (
+        <GlassCard className="p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-medium">
+              <Target className="h-4 w-4 text-primary" /> 今日重点词
+              <span className="text-xs font-normal text-muted-foreground">按 热频 × 遗忘风险 排序</span>
+            </h2>
+            <Link to="/learn" className="text-xs text-primary hover:underline">去学习 →</Link>
+          </div>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {focusWords.map((w) => (
+              <li key={w.id}>
+                <Link
+                  to="/learn"
+                  className="flex items-center gap-2.5 rounded-xl border bg-background/40 px-3 py-2 transition-colors hover:border-primary/40 hover:bg-secondary/40"
+                >
+                  <HeatBadge fs={w.fs} tier={w.tier} size="sm" />
+                  <span className="font-word text-sm font-semibold">{w.word}</span>
+                  <span className="truncate text-xs text-muted-foreground">{w.meanings[0]}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </GlassCard>
+      )}
     </div>
   );
 }

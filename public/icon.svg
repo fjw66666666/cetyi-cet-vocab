@@ -1,5 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#3d8f6a"/>
-  <text x="256" y="330" text-anchor="middle" font-family="Georgia, serif" font-size="220" font-weight="700" fill="#ffffff">词</text>
-  <circle cx="386" cy="140" r="34" fill="#c9efa2"/>
+  <defs>
+    <linearGradient id="neon" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="0.5" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#2DD4BF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0A0E1A"/>
+  <text x="256" y="340" text-anchor="middle" font-family="'Microsoft YaHei','PingFang SC',sans-serif" font-size="230" font-weight="700" fill="url(#neon)">词</text>
+  <circle cx="408" cy="108" r="26" fill="none" stroke="#2DD4BF" stroke-width="12"/>
 </svg>

@@ -4,6 +4,9 @@ export type Book = 'CET4' | 'CET6';
 /** 词汇层级：0 真题高频 / 1 核心 / 2 大纲 */
 export type Tier = 0 | 1 | 2;
 
+/** 热度档位：由 fs 映射（见 lib/priority.ts heatGrade） */
+export type HeatGrade = 'S' | 'A' | 'B' | 'C' | 'D';
+
 export interface WordEntry {
   id: string; // 单词拼写（跨词书去重键）
   word: string;
@@ -11,6 +14,7 @@ export interface WordEntry {
   us?: string; // 美音音标
   pos?: string; // 词性
   tier: Tier;
+  fs?: number; // 热频分 0-100（语料词频 × 大纲层级加权，见 scripts/add-frequency-score.py）
   meanings: string[]; // 多义项分列
   example?: { en: string; zh: string };
   mnemonic?: string; // 词根词缀/助记

@@ -4,6 +4,16 @@ module.exports = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'sans-serif'],
+        display: ['Space Grotesk', 'Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
+      },
+      backgroundImage: {
+        'tech-grid':
+          'linear-gradient(hsl(var(--border) / 0.55) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / 0.55) 1px, transparent 1px)',
+        'aurora-grad': 'linear-gradient(135deg, hsl(var(--grad-a)), hsl(var(--grad-b)) 55%, hsl(var(--grad-c)))',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Bookmark, ChevronDown, Search, Slash } from 'lucide-react';
 import { SpeakerButton } from '@/components/ui-bits';
+import { HeatBadge } from '@/components/HeatBadge';
 import { useWords } from '@/hooks/useWords';
 import { store, useAppState } from '@/lib/store';
 import { searchWords, wordsOfBook } from '@/lib/wordbank';
+import { heatGrade, isHot } from '@/lib/priority';
 import { cn } from '@/lib/utils';
 import type { Book, WordEntry } from '@/lib/types';
 
-type Filter = 'all' | 'starred' | 'wrong' | 'slain' | 'learning';
+type Filter = 'all' | 'hot' | 'starred' | 'wrong' | 'slain' | 'learning';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: '全部' },
+  { key: 'hot', label: '热度 S/A' },
   { key: 'starred', label: '生词本' },
   { key: 'wrong', label: '错词本' },
   { key: 'learning', label: '学习中' },
@@ -38,6 +41,7 @@ export default function LibraryPage() {
         case 'wrong': return (r?.wrong_count ?? 0) > 0 && !r?.slain;
         case 'slain': return r?.slain;
         case 'learning': return r && !r.slain && r.status !== 'new' && r.status !== 'mastered';
+        case 'hot': return isHot(heatGrade(w.fs, w.tier));
         default: return true;
       }
     });
@@ -126,6 +130,7 @@ export default function LibraryPage() {
                   <div className="flex items-baseline gap-2">
                     <span className="font-word text-base font-semibold">{w.word}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">{w.uk}</span>
+                    <HeatBadge fs={w.fs} tier={w.tier} size="sm" />
                     <span className={cn(
                       'shrink-0 rounded-full px-2 py-0.5 text-[10px]',
                       w.tier === 0 ? 'bg-primary/10 text-primary' : w.tier === 1 ? 'bg-secondary text-muted-foreground' : 'bg-secondary/60 text-muted-foreground',
