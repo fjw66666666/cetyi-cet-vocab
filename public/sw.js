@@ -1,5 +1,6 @@
-// 离线缓存：应用外壳 + 已加载的词库分片
-const CACHE = 'cetyi-v4';
+// 离线缓存：应用外壳 + 已加载的词库分片 + 下载文件后台缓存
+const CACHE = 'cetyi-v5';
+const DOWNLOAD_CACHE = 'cetyi-downloads-v1';
 const CORE = [
   './',
   './index.html',
@@ -16,7 +17,12 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE && k !== DOWNLOAD_CACHE).map((k) => caches.delete(k))),
+      )
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -38,4 +44,20 @@ self.addEventListener('fetch', (e) => {
       return hit || fetched;
     }),
   );
+});
+
+// 后台下载缓存：页面通过 postMessage 发送 { type: 'cache-download', url }
+self.addEventListener('message', (e) => {
+  if (e.data?.type === 'cache-download') {
+    const { url } = e.data;
+    e.waitUntil(
+      caches.open(DOWNLOAD_CACHE).then((cache) =>
+        fetch(url)
+          .then((res) => {
+            if (res.ok) cache.put(url, res.clone());
+          })
+          .catch(() => {}),
+      ),
+    );
+  }
 });

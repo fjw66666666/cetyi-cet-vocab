@@ -1,19 +1,49 @@
 import { useRef, useState } from 'react';
-import { Bell, Download, Moon, Sun, Trash2, Upload } from 'lucide-react';
+import { Bell, BookOpen, Download, Moon, Star, Sun, Trash2, Upload, XCircle } from 'lucide-react';
 import { SRS_CONFIG } from '@/lib/config';
 import { ensureNotifyPermission } from '@/lib/notify';
 import { store, useAppState } from '@/lib/store';
+import { useWords } from '@/hooks/useWords';
+import { useDownload } from '@/hooks/useDownload';
+import { DownloadProgressBar } from '@/components/DownloadProgress';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const state = useAppState();
   const s = state.settings;
+  const words = useWords();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
+  const { status, progress, filename, saveText, reset } = useDownload();
 
   const flash = (m: string) => {
     setMsg(m);
     setTimeout(() => setMsg(''), 2500);
+  };
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  // 导出当前词书的全部单词为 JSON
+  const exportVocab = () => {
+    const list = [...words.values()].filter((w) => w.books.includes(state.activeBook));
+    const data = JSON.stringify({ book: state.activeBook, exportedAt: new Date().toISOString(), words: list }, null, 2);
+    saveText(data, `cetyi-${state.activeBook}-vocab-${dateStr}.json`, 'application/json');
+  };
+
+  // 导出生词本（starred）为 TXT
+  const exportStarred = () => {
+    const starred = [...words.values()].filter((w) => state.records[w.id]?.starred);
+    if (starred.length === 0) return flash('生词本为空');
+    const lines = starred.map((w) => `${w.word}\t${w.meanings.join('；')}`);
+    saveText(lines.join('\n'), `cetyi-starred-${dateStr}.txt`, 'text/plain');
+  };
+
+  // 导出错词本（wrong_count > 0）为 TXT
+  const exportWrong = () => {
+    const wrong = [...words.values()].filter((w) => (state.records[w.id]?.wrong_count ?? 0) > 0 && !state.records[w.id]?.slain);
+    if (wrong.length === 0) return flash('错词本为空');
+    const lines = wrong.map((w) => `${w.word}\t错${state.records[w.id]!.wrong_count}次\t${w.meanings.join('；')}`);
+    saveText(lines.join('\n'), `cetyi-wrong-${dateStr}.txt`, 'text/plain');
   };
 
   return (
@@ -135,20 +165,31 @@ export default function SettingsPage() {
       {/* 数据管理 */}
       <section className="space-y-3 rounded-2xl border bg-card p-5">
         <h2 className="text-sm font-medium">数据管理</h2>
-        <p className="text-xs text-muted-foreground">数据保存在本机浏览器（含 user_id，支持后续云同步扩展）。</p>
+        <p className="text-xs text-muted-foreground">数据保存在本机浏览器（含 user_id，支持后续云同步扩展）。导出文件可在手机上离线查看或迁移到其他设备。</p>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => {
-              const blob = new Blob([store.exportJson()], { type: 'application/json' });
-              const a = document.createElement('a');
-              a.href = URL.createObjectURL(blob);
-              a.download = `cetyi-backup-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              flash('已导出备份文件');
-            }}
+            onClick={() => saveText(store.exportJson(), `cetyi-backup-${dateStr}.json`, 'application/json')}
             className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm"
           >
             <Download className="h-4 w-4" /> 导出备份
+          </button>
+          <button
+            onClick={exportVocab}
+            className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm"
+          >
+            <BookOpen className="h-4 w-4" /> 导出{state.activeBook === 'CET4' ? '四级' : '六级'}词库
+          </button>
+          <button
+            onClick={exportStarred}
+            className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm"
+          >
+            <Star className="h-4 w-4" /> 导出生词本
+          </button>
+          <button
+            onClick={exportWrong}
+            className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm"
+          >
+            <XCircle className="h-4 w-4" /> 导出错词本
           </button>
           <button
             onClick={() => fileRef.current?.click()}
@@ -182,6 +223,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </section>
+
+      <DownloadProgressBar status={status} progress={progress} filename={filename} onClose={reset} />
     </div>
   );
 }

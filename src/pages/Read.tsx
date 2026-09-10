@@ -1,10 +1,12 @@
 // 阅读页：文章列表 ⇄ 详情（单路由内视图切换），点词查词 + 滚动/时长进度记录
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Download, ExternalLink } from 'lucide-react';
 import { ArticleText } from '@/components/ArticleText';
+import { DownloadProgressBar } from '@/components/DownloadProgress';
 import { GlassCard } from '@/components/GlassCard';
 import { WordPopover } from '@/components/WordPopover';
 import { useWords } from '@/hooks/useWords';
+import { useDownload } from '@/hooks/useDownload';
 import { loadArticle, loadArticleIndex, loadChangelog } from '@/lib/articles';
 import type { ChangelogEntry } from '@/lib/articles';
 import { store, useAppState } from '@/lib/store';
@@ -199,6 +201,43 @@ export default function ReadPage() {
     if (article && selectedWord) store.markReadingUnknown(article.id, selectedWord.id);
   }, [article, selectedWord]);
 
+  const { status, progress, filename, saveText, reset } = useDownload();
+
+  // 下载本文为 Markdown 或纯文本
+  const downloadArticle = useCallback(
+    (fmt: 'md' | 'txt') => {
+      if (!article) return;
+      const ext = fmt === 'md' ? 'md' : 'txt';
+      const mime = fmt === 'md' ? 'text/markdown' : 'text/plain';
+      const lines: string[] = [];
+      lines.push(`# ${article.title}`);
+      lines.push('');
+      lines.push(`> 难度 ${article.level} · ${article.category} · ${article.wordCount} 词 · 重点词覆盖率 ${Math.round(article.hotCoverage)}%`);
+      lines.push('');
+      if (article.summary) {
+        lines.push(`**摘要**：${article.summary}`);
+        lines.push('');
+      }
+      lines.push('---');
+      lines.push('');
+      for (const p of article.paragraphs) {
+        lines.push(p);
+        lines.push('');
+      }
+      if (article.hotWords.length > 0) {
+        lines.push('---');
+        lines.push('');
+        lines.push(`**本文重点词（${article.hotWords.length}）**：`);
+        lines.push(article.hotWords.join('、'));
+        lines.push('');
+      }
+      lines.push(`---\n\n来源：${article.source}${article.sourceUrl ? `（${article.sourceUrl}）` : ''}`);
+      const content = fmt === 'md' ? lines.join('\n') : lines.map((l) => l.replace(/[#>*_`-]/g, '')).join('\n');
+      saveText(content, `${article.slug}.${ext}`, mime);
+    },
+    [article, saveText],
+  );
+
   // ------- 详情视图 -------
   if (slug) {
     return (
@@ -239,6 +278,13 @@ export default function ReadPage() {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
+                <button
+                  type="button"
+                  onClick={() => downloadArticle('md')}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs text-primary transition-colors hover:bg-primary/20"
+                >
+                  <Download className="h-3 w-3" /> 下载本文
+                </button>
               </div>
 
               {article.hotWords.length > 0 && (
@@ -271,6 +317,8 @@ export default function ReadPage() {
           onMark={handleMark}
           anchorRef={anchorRef}
         />
+
+        <DownloadProgressBar status={status} progress={progress} filename={filename} onClose={reset} />
       </div>
     );
   }
