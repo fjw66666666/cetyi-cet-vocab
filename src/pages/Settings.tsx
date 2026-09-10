@@ -6,6 +6,7 @@ import { store, useAppState } from '@/lib/store';
 import { useWords } from '@/hooks/useWords';
 import { useDownload } from '@/hooks/useDownload';
 import { DownloadProgressBar } from '@/components/DownloadProgress';
+import { WeChatGuide } from '@/components/WeChatGuide';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -14,7 +15,7 @@ export default function SettingsPage() {
   const words = useWords();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
-  const { status, progress, filename, saveText, reset } = useDownload();
+  const { status, progress, filename, showWeChatGuide, setShowWeChatGuide, saveText, reset } = useDownload();
 
   const flash = (m: string) => {
     setMsg(m);
@@ -225,6 +226,7 @@ export default function SettingsPage() {
       </section>
 
       <DownloadProgressBar status={status} progress={progress} filename={filename} onClose={reset} />
+      {showWeChatGuide && <WeChatGuide onClose={() => setShowWeChatGuide(false)} />}
     </div>
   );
 }

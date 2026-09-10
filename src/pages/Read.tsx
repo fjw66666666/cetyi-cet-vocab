@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, Download, ExternalLink } from 'lucide-react';
 import { ArticleText } from '@/components/ArticleText';
 import { DownloadProgressBar } from '@/components/DownloadProgress';
+import { WeChatGuide } from '@/components/WeChatGuide';
 import { GlassCard } from '@/components/GlassCard';
 import { WordPopover } from '@/components/WordPopover';
 import { useWords } from '@/hooks/useWords';
@@ -201,7 +202,7 @@ export default function ReadPage() {
     if (article && selectedWord) store.markReadingUnknown(article.id, selectedWord.id);
   }, [article, selectedWord]);
 
-  const { status, progress, filename, saveText, reset } = useDownload();
+  const { status, progress, filename, showWeChatGuide, setShowWeChatGuide, saveText, reset } = useDownload();
 
   // 下载本文为 Markdown 或纯文本
   const downloadArticle = useCallback(
@@ -319,6 +320,7 @@ export default function ReadPage() {
         />
 
         <DownloadProgressBar status={status} progress={progress} filename={filename} onClose={reset} />
+        {showWeChatGuide && <WeChatGuide onClose={() => setShowWeChatGuide(false)} />}
       </div>
     );
   }
