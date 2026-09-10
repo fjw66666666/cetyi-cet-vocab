@@ -83,10 +83,10 @@ def main() -> int:
             g = 'S' if fs >= 90 else 'A' if fs >= 78 else 'B' if fs >= 62 else 'C' if fs >= 45 else 'D'
             dist[g] += 1
             rebuilt.append(insert_after_tier(w, fs))
-        path.write_text(
-            json.dumps(rebuilt, ensure_ascii=False, separators=(',', ':')) + '\n',
-            encoding='utf-8',
-        )
+        # 注：本机环境 Path.write_text 曾静默失效（写后读回旧值），统一用 open()+json.dump 落盘
+        with path.open('w', encoding='utf-8') as fh:
+            json.dump(rebuilt, fh, ensure_ascii=False, separators=(',', ':'))
+            fh.write('\n')
         total += len(rebuilt)
         print(f'{path.name}: {len(rebuilt)} 词已写入 fs')
 

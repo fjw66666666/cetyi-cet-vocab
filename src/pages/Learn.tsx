@@ -26,18 +26,27 @@ export default function LearnPage() {
   const sprintPool = useMemo(() => sprintWords(bookWords, state.records), [bookWords, state.records]);
   const sourceList: WordEntry[] = mode === 'sprint' ? sprintPool : news.map((id) => all.get(id)).filter(Boolean) as WordEntry[];
 
+  // 会话队列快照：records 变化（自评后 words 出队）不再重算队列，保证当次会话稳定
+  const [queue, setQueue] = useState<WordEntry[]>([]);
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [graded, setGraded] = useState<number[]>([]);
+  const [answered, setAnswered] = useState<Map<string, Grade>>(new Map());
+  const [reinserted, setReinserted] = useState<Set<string>>(new Set());
   const [start] = useState(Date.now());
 
-  const queue = sourceList;
+  // 模式切换 / 词库就绪时重建会话（重置进度与统计）
+  useEffect(() => {
+    setQueue(sourceList);
+    setIdx(0);
+    setFlipped(false);
+    setAnswered(new Map());
+    setReinserted(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在模式与词库变化时重建
+  }, [mode, all]);
+
   const switchMode = (m: LearnMode) => {
     if (m === mode) return;
     setMode(m);
-    setIdx(0);
-    setGraded([]);
-    setFlipped(false);
   };
 
   // 学习用时统计（离开页面时记录）
@@ -49,13 +58,26 @@ export default function LearnPage() {
   }, [start]);
 
   const word = queue[idx];
-  const done = idx >= queue.length;
+  const done = queue.length > 0 && idx >= queue.length;
 
   const grade = (g: Grade) => {
     if (!word) return;
     store.grade(word.id, g, { isNew: true, xpBase: XP_RULES.learn });
-    setGraded((p) => [...p, g]);
+    setAnswered((m) => {
+      const n = new Map(m);
+      n.set(word.id, g);
+      return n;
+    });
     setFlipped(false);
+    // 模糊：当次会话稍后再现一次（每词每会话上限 1 次）
+    if (g === 1 && !reinserted.has(word.id)) {
+      setReinserted((s) => new Set(s).add(word.id));
+      setQueue((q) => {
+        const next = [...q];
+        next.splice(idx + 1, 0, word);
+        return next;
+      });
+    }
     setIdx((i) => i + 1);
   };
 
@@ -64,6 +86,9 @@ export default function LearnPage() {
     if (word) speak(word.word, state.settings.voice);
   }, [word, state.settings.voice]);
 
+  if (queue.length === 0 && (mode === 'normal' ? news.length > 0 : sprintPool.length > 0)) {
+    return null; // 队列快照尚未建立，等待 effect 填充
+  }
   if (queue.length === 0) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
@@ -74,11 +99,11 @@ export default function LearnPage() {
   }
 
   if (done) {
-    const known = graded.filter((g) => g === 2).length;
+    const known = [...answered.values()].filter((g) => g === 2).length;
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 p-6 text-center">
         <CheckCircle2 className="h-16 w-16 animate-pop text-primary" />
-        <h1 className="text-2xl font-semibold">完成 {queue.length} 个新词！</h1>
+        <h1 className="text-2xl font-semibold">完成 {answered.size} 个新词！</h1>
         <p className="text-sm text-muted-foreground">
           一遍认识 {known} 个 · 10 分钟后它们会出现在复习队列里
         </p>

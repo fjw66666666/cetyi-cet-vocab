@@ -71,6 +71,17 @@ export default function StatsPage() {
     return { days: days.length, ...sum };
   }, [state.days]);
 
+  // 阅读统计
+  const readingStats = useMemo(() => {
+    const articles = Object.values(state.reading.articles);
+    const totalMs = articles.reduce((s, a) => s + a.timeMs, 0);
+    const read = articles.filter((a) => a.readCount > 0).length;
+    const withTime = articles.filter((a) => a.timeMs > 0).length;
+    const unknown = new Set<string>();
+    for (const a of articles) for (const id of a.unknownIds) unknown.add(id);
+    return { totalMs, read, withTime, unknown: unknown.size };
+  }, [state.reading.articles]);
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">学习统计</h1>
@@ -83,6 +94,17 @@ export default function StatsPage() {
           value={today.correct + today.wrong > 0 ? `${Math.round((today.correct / (today.correct + today.wrong)) * 100)}%` : '—'}
         />
         <StatCard label="今日用时" value={`${Math.floor(today.seconds / 60)} 分钟`} />
+      </section>
+
+      {/* 阅读统计 */}
+      <section>
+        <h2 className="text-sm font-medium text-muted-foreground">阅读统计</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard label="总阅读时长（分钟）" value={Math.round(readingStats.totalMs / 60000)} />
+          <StatCard label="已读文章" value={readingStats.read} />
+          <StatCard label="有阅读时长的文章" value={readingStats.withTime} />
+          <StatCard label="阅读标记生词" value={readingStats.unknown} />
+        </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">

@@ -68,6 +68,40 @@ export interface VocabTest {
   size: number; // 估算词汇量
 }
 
+// ---------------- 阅读模块 ----------------
+
+export type ArticleCategory = '教育' | '科技' | '健康' | '文化' | '环境' | '新闻' | '其他';
+
+export interface ArticleMeta {
+  id: string;
+  slug: string;
+  title: string;
+  category: ArticleCategory;
+  level: 1 | 2 | 3 | 4 | 5; // 难度档
+  difficulty: number; // 0-100 难度分
+  hotCoverage: number; // S/A 重点词覆盖率 %
+  wordCount: number;
+  source: string;
+  sourceUrl: string;
+  published_at: string;
+  updated_at: string;
+  reviewed: 'pending' | 'ok';
+}
+
+export interface Article extends ArticleMeta {
+  summary: string;
+  paragraphs: string[];
+  hotWords: string[]; // 文中 S/A 重点词（按出现序去重）
+}
+
+export interface ReadingArticleState {
+  progress: number; // 0-1 滚动进度
+  timeMs: number; // 累计阅读时长
+  unknownIds: string[]; // 阅读中标记的生词
+  readCount: number;
+  lastReadAt: number;
+}
+
 export interface AppState {
   user_id: string;
   activeBook: Book;
@@ -79,4 +113,5 @@ export interface AppState {
   achievements: string[]; // 已解锁徽章 id
   vocabTests: VocabTest[];
   learnedAt: Record<string, number>; // word -> 首次学习时间（用于当天结束回顾）
+  reading: { articles: Record<string, ReadingArticleState> }; // key = article id
 }

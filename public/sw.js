@@ -1,5 +1,5 @@
 // 离线缓存：应用外壳 + 已加载的词库分片
-const CACHE = 'cetyi-v3';
+const CACHE = 'cetyi-v4';
 const CORE = [
   './',
   './index.html',

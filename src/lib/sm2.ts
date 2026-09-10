@@ -1,5 +1,6 @@
 // 改进版 SM-2 间隔重复调度引擎（纯函数，便于测试与调优）
 import { SRS_CONFIG } from './config';
+import { displayPriority } from './priority';
 import type { Grade, MemoryRecord, WordEntry } from './types';
 
 const MIN = 60_000;
@@ -78,6 +79,84 @@ export function dueWords(records: Record<string, MemoryRecord>, now: number): st
     .map((r) => r.word_id);
 }
 
+/** 每日确定性扰动（0–1）：让排序键随日期轮换，打破固定顺序但不破坏优先级主序 */
+function dayJitter(id: string, day: number): number {
+  const s = id + ':' + day;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return ((h >>> 0) % 1000) / 1000;
+}
+
+/**
+ * 新词挑选（重点词加权，不修改 SM-2 调度）：
+ * 1. 阅读标记生词（starred ∧ status=new）置顶，按标记时间先后
+ * 2. 约 70% 名额按展示优先级（热频分×大纲×遗忘风险）取 → 四级重点词(S/A)高频出现
+ * 3. 约 30% 名额从分层轮换池补足 → 非重点词按合理频率持续出现（每日轮换起点）
+ */
+export function pickNewWords(
+  words: WordEntry[],
+  records: Record<string, MemoryRecord>,
+  dailyNew: number,
+  now: number,
+): string[] {
+  const pool = words.filter((w) => {
+    const r = records[w.id];
+    return (!r || r.status === 'new') && !r?.slain;
+  });
+  const starredNew: string[] = [];
+  const rest: WordEntry[] = [];
+  for (const w of pool) {
+    const r = records[w.id];
+    if (r && r.starred) starredNew.push(w.id);
+    else rest.push(w);
+  }
+  starredNew.sort((a, b) => records[a].created_at - records[b].created_at);
+  if (starredNew.length >= dailyNew) return starredNew.slice(0, dailyNew);
+
+  const day = Math.floor(now / 86400_000);
+  const quotaHot = Math.round(dailyNew * 0.7);
+  const picked: string[] = [];
+  const seen = new Set<string>();
+
+  // 70% 名额：按展示优先级（重点词天然靠前）+ 每日扰动
+  const byPriority = [...rest].sort((a, b) => {
+    const pa = displayPriority(a, records[a.id], now) + 0.1 * dayJitter(a.id, day);
+    const pb = displayPriority(b, records[b.id], now) + 0.1 * dayJitter(b.id, day);
+    return pb - pa;
+  });
+  for (const w of byPriority) {
+    if (picked.length >= quotaHot) break;
+    if (!seen.has(w.id)) { seen.add(w.id); picked.push(w.id); }
+  }
+
+  // 30% 名额：三层大纲轮流取样（tier 0/1/2 各自按字母序，起点随日期轮换）
+  const tierLists: WordEntry[][] = [[], [], []];
+  for (const w of rest) tierLists[w.tier].push(w);
+  for (const list of tierLists) list.sort((a, b) => a.word.localeCompare(b.word));
+  const interleaved: WordEntry[] = [];
+  const cursors = [0, 0, 0];
+  const total = rest.length;
+  for (let pass = 0; pass < Math.max(1, total); pass++) {
+    let progressed = false;
+    for (let t = 0; t < 3; t++) {
+      const tier = (day + t) % 3;
+      if (cursors[tier] < tierLists[tier].length) {
+        interleaved.push(tierLists[tier][cursors[tier]++]);
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  const rot = day % Math.max(1, interleaved.length);
+  const rotated = [...interleaved.slice(rot), ...interleaved.slice(0, rot)];
+  for (const w of rotated) {
+    if (picked.length >= dailyNew) break;
+    if (!seen.has(w.id)) { seen.add(w.id); picked.push(w.id); }
+  }
+
+  return [...starredNew.slice(0, dailyNew), ...picked].slice(0, dailyNew);
+}
+
 /**
  * 今日任务 = 到期复习（始终优先）+ 适量新词（防复习雪崩）
  * 返回 { due, news, paused } — paused=true 表示因复习量过大暂停新词
@@ -92,12 +171,7 @@ export function buildTodayQueue(
   const paused = due.length > dailyNew * SRS_CONFIG.avalanche_ratio;
   let news: string[] = [];
   if (!paused) {
-    news = words
-      .filter((w) => !records[w.id] || records[w.id].status === 'new')
-      .filter((w) => !records[w.id]?.slain)
-      .sort((a, b) => a.tier - b.tier) // 高频优先
-      .slice(0, dailyNew)
-      .map((w) => w.id);
+    news = pickNewWords(words, records, dailyNew, now);
   }
   return { due, news, paused };
 }

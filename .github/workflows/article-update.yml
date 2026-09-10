@@ -1,0 +1,46 @@
+name: Weekly Article Update
+
+# 每周拉取 VOA 慢速英语文章 → 机审 → 自动开 PR 人工审核（合并后由 deploy.yml 自动上线）
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # 每周一 UTC 02:00
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-articles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch & audit articles (VOA RSS)
+        run: python scripts/fetch-articles.py
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'content: update English articles (${{ github.run_number }})'
+          branch: content/articles-update
+          title: '内容更新：英语文章机审入库（${{ github.run_number }}）'
+          body: |
+            由每周文章更新管线自动生成。
+
+            - 来源：VOA Learning English（慢速英语 RSS）
+            - 机审规则：正文 150–500 词、CET4 S/A 重点词覆盖率 ≥ 8%、无 HTML 残留、难度分档 1–5
+            - 请人工审核文章质量与语言准确性后合并；合并后 deploy.yml 自动发布。
+
+            审核清单：
+            - [ ] 文章内容无版权/立场问题，已保留来源链接
+            - [ ] 难度档位与主题分类合理
+            - [ ] 重点词标注正确
+          delete-branch: true

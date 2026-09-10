@@ -1,7 +1,7 @@
 // 本地持久化存储 + 可订阅状态（localStorage 实现，结构预留 user_id 便于云端扩展）
 import { useSyncExternalStore } from 'react';
 import { SRS_CONFIG } from './config';
-import type { AppState, DayLog, Grade, Settings, VocabTest } from './types';
+import type { AppState, DayLog, Grade, ReadingArticleState, Settings, VocabTest } from './types';
 import { createRecord, schedule } from './sm2';
 import { checkAchievements, markHourFlags } from './gamification';
 
@@ -30,6 +30,7 @@ function defaultState(): AppState {
     achievements: [],
     vocabTests: [],
     learnedAt: {},
+    reading: { articles: {} },
   };
 }
 
@@ -38,7 +39,12 @@ function load(): AppState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw) as AppState;
-    return { ...defaultState(), ...parsed, settings: { ...defaultState().settings, ...parsed.settings } };
+    return {
+      ...defaultState(),
+      ...parsed,
+      settings: { ...defaultState().settings, ...parsed.settings },
+      reading: { articles: { ...(parsed.reading?.articles ?? {}) } },
+    };
   } catch {
     return defaultState();
   }
@@ -129,6 +135,49 @@ class AppStore {
       day.xp += xp;
       s.days[dk] = day;
       s.achievements = checkAchievements(s);
+    });
+  }
+
+  /** 保存某篇文章的阅读状态（进度/时长等，浅合并） */
+  saveReadingProgress(articleId: string, patch: Partial<ReadingArticleState>) {
+    this.update((s) => {
+      const cur: ReadingArticleState = s.reading.articles[articleId] ?? {
+        progress: 0,
+        timeMs: 0,
+        unknownIds: [],
+        readCount: 0,
+        lastReadAt: 0,
+      };
+      s.reading.articles[articleId] = { ...cur, ...patch };
+    });
+  }
+
+  /** 阅读中标记生词：记入该文章的 unknownIds（不含调度） */
+  markReadingUnknown(articleId: string, wordId: string) {
+    this.update((s) => {
+      const cur: ReadingArticleState = s.reading.articles[articleId] ?? {
+        progress: 0,
+        timeMs: 0,
+        unknownIds: [],
+        readCount: 0,
+        lastReadAt: 0,
+      };
+      if (!cur.unknownIds.includes(wordId)) cur.unknownIds.push(wordId);
+      s.reading.articles[articleId] = cur;
+    });
+  }
+
+  /** 从阅读加入学习计划：建记录、保持未学状态、进生词本（当日新词队列置顶） */
+  markFromReading(wordId: string) {
+    const now = Date.now();
+    this.update((s) => {
+      const rec = s.records[wordId] ?? createRecord(s.user_id, wordId, now);
+      rec.status = 'new';
+      rec.next_review_at = Number.MAX_SAFE_INTEGER;
+      rec.starred = true;
+      rec.slain = false;
+      rec.updated_at = now;
+      s.records[wordId] = rec;
     });
   }
 

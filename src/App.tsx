@@ -1,9 +1,10 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router';
-import { BarChart3, BookOpenText, Home, Settings as SettingsIcon, Trophy } from 'lucide-react';
+import { BarChart3, BookOpenText, Home, Newspaper, Settings as SettingsIcon, Trophy } from 'lucide-react';
 import { WordsProvider } from '@/hooks/useWords';
 import { useTheme } from '@/hooks/useTheme';
 import { AuroraBackground } from '@/components/AuroraBackground';
+import { Toaster } from '@/components/ui/sonner';
 import { startNotifyLoop } from '@/lib/notify';
 import HomePage from '@/pages/Home';
 import { cn } from '@/lib/utils';
@@ -14,11 +15,13 @@ const ListenPage = lazy(() => import('@/pages/Listen'));
 const StatsPage = lazy(() => import('@/pages/Stats'));
 const AchievementsPage = lazy(() => import('@/pages/Achievements'));
 const LibraryPage = lazy(() => import('@/pages/Library'));
+const ReadPage = lazy(() => import('@/pages/Read'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 
 const NAV = [
   { to: '/', label: '今日', icon: Home },
   { to: '/library', label: '词库', icon: BookOpenText },
+  { to: '/read', label: '阅读', icon: Newspaper },
   { to: '/stats', label: '统计', icon: BarChart3 },
   { to: '/achievements', label: '成就', icon: Trophy },
   { to: '/settings', label: '设置', icon: SettingsIcon },
@@ -80,6 +83,7 @@ function Shell() {
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/read" element={<ReadPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </div>
@@ -89,7 +93,7 @@ function Shell() {
       {/* 移动端底部标签栏 */}
       {!immersive && (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t bg-background/90 backdrop-blur md:hidden">
-          <div className="grid grid-cols-5">
+          <div className="grid grid-cols-6">
             {NAV.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -97,7 +101,7 @@ function Shell() {
                 end={to === '/'}
                 className={({ isActive }) =>
                   cn(
-                    'flex flex-col items-center gap-0.5 py-2 text-[11px] text-muted-foreground',
+                    'flex flex-col items-center gap-0.5 py-2 text-[10px] text-muted-foreground',
                     isActive && 'text-primary',
                   )
                 }
@@ -109,6 +113,8 @@ function Shell() {
           </div>
         </nav>
       )}
+
+      <Toaster />
     </div>
   );
 }
