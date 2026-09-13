@@ -11,6 +11,10 @@ import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/600.css'
 import './index.css'
 import App from './App.tsx'
+import { initExtApi } from './lib/extapi'
+
+// 外部扩展接口：postMessage 跨域通道 + window.CetyiExt 同源桥（幂等，StrictMode 安全）
+initExtApi()
 
 // PWA：生产环境注册 Service Worker（离线复习已缓存词库）
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

@@ -7,6 +7,7 @@ import { useWords } from '@/hooks/useWords';
 import { useDownload } from '@/hooks/useDownload';
 import { DownloadProgressBar } from '@/components/DownloadProgress';
 import { WeChatGuide } from '@/components/WeChatGuide';
+import ExtApiPanel from '@/components/ExtApiPanel';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -224,6 +225,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </section>
+
+      <ExtApiPanel />
 
       <DownloadProgressBar status={status} progress={progress} filename={filename} onClose={reset} />
       {showWeChatGuide && <WeChatGuide onClose={() => setShowWeChatGuide(false)} />}
