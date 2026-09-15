@@ -39,14 +39,180 @@ DATA = ROOT / "public" / "data"
 PROGRESS = ROOT / "scripts" / ".enrich-progress.jsonl"
 REJECTS = ROOT / "scripts" / ".enrich-rejects.jsonl"
 
-BATCH_SIZE = 60
+# 每批词数。原为 60：单批输出常在 12000 token 边界被截断，导致整批 JSON 解析失败。
+BATCH_SIZE = 40
 REQ_TIMEOUT = 280          # 单批请求超时（秒）
 RETRIES = 3                # 单批失败重试次数
 CONTENT_KEYS = ("example", "mnemonic", "collocations", "derivatives", "confusables")
 
 CH_RE = re.compile(r"[一-鿿]")
-# 例句中允许出现的词形变化后缀（大小写不敏感）
-VARIANT_SUFFIX = r"(?:s|es|ed|ing|ly|d|er|est|ies|ied|tion|sion|al|ous|ive|ity|ment|ness|ful|less|able|ible|y)?"
+VOWELS = "aeiou"
+
+# 常见不规则变化（只收四六级高频，够用即可，不追求完备）
+# 说明：原实现只支持「原词 + 后缀」，导致 embracing / batteries / gripped / found
+# 这类正常变形被判为「例句不含该词」，把合格例句整批误杀。
+IRREGULAR: dict[str, set[str]] = {
+    "be": {"am", "is", "are", "was", "were", "been", "being"},
+    "have": {"has", "had", "having"},
+    "do": {"does", "did", "done", "doing"},
+    "go": {"goes", "went", "gone", "going"},
+    "make": {"made", "makes", "making"},
+    "find": {"found", "finds", "finding"},
+    "fight": {"fought", "fights", "fighting"},
+    "dig": {"dug", "digs", "digging"},
+    "hide": {"hid", "hidden", "hides", "hiding"},
+    "drink": {"drank", "drunk", "drinks", "drinking"},
+    "blow": {"blew", "blown", "blows", "blowing"},
+    "creep": {"crept", "creeps", "creeping"},
+    "withdraw": {"withdrew", "withdrawn", "withdraws", "withdrawing"},
+    "overcome": {"overcame", "overcomes", "overcoming"},
+    "begin": {"began", "begun", "begins", "beginning"},
+    "break": {"broke", "broken", "breaks", "breaking"},
+    "bring": {"brought", "brings", "bringing"},
+    "build": {"built", "builds", "building"},
+    "buy": {"bought", "buys", "buying"},
+    "catch": {"caught", "catches", "catching"},
+    "choose": {"chose", "chosen", "chooses", "choosing"},
+    "come": {"came", "comes", "coming"},
+    "cut": {"cut", "cuts", "cutting"},
+    "deal": {"dealt", "deals", "dealing"},
+    "draw": {"drew", "drawn", "draws", "drawing"},
+    "drive": {"drove", "driven", "drives", "driving"},
+    "eat": {"ate", "eaten", "eats", "eating"},
+    "fall": {"fell", "fallen", "falls", "falling"},
+    "feed": {"fed", "feeds", "feeding"},
+    "fly": {"flew", "flown", "flies", "flying"},
+    "forget": {"forgot", "forgotten", "forgets", "forgetting"},
+    "forgive": {"forgave", "forgiven", "forgives", "forgiving"},
+    "freeze": {"froze", "frozen", "freezes", "freezing"},
+    "get": {"got", "gotten", "gets", "getting"},
+    "give": {"gave", "given", "gives", "giving"},
+    "grow": {"grew", "grown", "grows", "growing"},
+    "hold": {"held", "holds", "holding"},
+    "keep": {"kept", "keeps", "keeping"},
+    "know": {"knew", "known", "knows", "knowing"},
+    "lay": {"laid", "lays", "laying"},
+    "lead": {"led", "leads", "leading"},
+    "leave": {"left", "leaves", "leaving"},
+    "lend": {"lent", "lends", "lending"},
+    "lie": {"lay", "lain", "lies", "lying"},
+    "lose": {"lost", "loses", "losing"},
+    "mean": {"meant", "means", "meaning"},
+    "meet": {"met", "meets", "meeting"},
+    "pay": {"paid", "pays", "paying"},
+    "put": {"puts", "putting"},
+    "read": {"reads", "reading"},
+    "ride": {"rode", "ridden", "rides", "riding"},
+    "ring": {"rang", "rung", "rings", "ringing"},
+    "rise": {"rose", "risen", "rises", "rising"},
+    "run": {"ran", "runs", "running"},
+    "say": {"said", "says", "saying"},
+    "see": {"saw", "seen", "sees", "seeing"},
+    "seek": {"sought", "seeks", "seeking"},
+    "sell": {"sold", "sells", "selling"},
+    "send": {"sent", "sends", "sending"},
+    "set": {"sets", "setting"},
+    "shake": {"shook", "shaken", "shakes", "shaking"},
+    "shoot": {"shot", "shoots", "shooting"},
+    "show": {"showed", "shown", "shows", "showing"},
+    "shut": {"shuts", "shutting"},
+    "sing": {"sang", "sung", "sings", "singing"},
+    "sink": {"sank", "sunk", "sinks", "sinking"},
+    "sit": {"sat", "sits", "sitting"},
+    "sleep": {"slept", "sleeps", "sleeping"},
+    "slide": {"slid", "slides", "sliding"},
+    "speak": {"spoke", "spoken", "speaks", "speaking"},
+    "spend": {"spent", "spends", "spending"},
+    "stand": {"stood", "stands", "standing"},
+    "steal": {"stole", "stolen", "steals", "stealing"},
+    "stick": {"stuck", "sticks", "sticking"},
+    "strike": {"struck", "strikes", "striking"},
+    "swear": {"swore", "sworn", "swears", "swearing"},
+    "sweep": {"swept", "sweeps", "sweeping"},
+    "swim": {"swam", "swum", "swims", "swimming"},
+    "take": {"took", "taken", "takes", "taking"},
+    "teach": {"taught", "teaches", "teaching"},
+    "tear": {"tore", "torn", "tears", "tearing"},
+    "tell": {"told", "tells", "telling"},
+    "think": {"thought", "thinks", "thinking"},
+    "throw": {"threw", "thrown", "throws", "throwing"},
+    "understand": {"understood", "understands", "understanding"},
+    "wake": {"woke", "woken", "wakes", "waking"},
+    "wear": {"wore", "worn", "wears", "wearing"},
+    "win": {"won", "wins", "winning"},
+    "wind": {"wound", "winds", "winding"},
+    "write": {"wrote", "written", "writes", "writing"},
+    "child": {"children"},
+    "foot": {"feet"},
+    "tooth": {"teeth"},
+    "goose": {"geese"},
+    "mouse": {"mice"},
+    "man": {"men"},
+    "woman": {"women"},
+    "person": {"people"},
+    "life": {"lives"},
+    "knife": {"knives"},
+    "wife": {"wives"},
+    "leaf": {"leaves"},
+    "half": {"halves"},
+    "shelf": {"shelves"},
+    "wolf": {"wolves"},
+    "self": {"selves"},
+    "thief": {"thieves"},
+    "loaf": {"loaves"},
+}
+
+
+def inflections(word: str) -> set[str]:
+    """生成该词的常见词形：原词 + 规则屈折 + 不规则表。
+
+    覆盖四类规则变形，外加常见派生后缀：
+      1. 直接加后缀            work -> works / worked / working
+      2. 去 e 加后缀           embrace -> embracing / embraced
+      3. 辅音 + y -> i + 后缀  battery -> batteries, marry -> married
+      4. 单音节 CVC 双写末辅音  pat -> patted, grip -> gripped
+    """
+    w = word.lower()
+    forms: set[str] = {w}
+    if not w.isalpha():
+        return forms
+
+    forms |= IRREGULAR.get(w, set())
+
+    # 1) 直接加后缀
+    for suf in ("s", "es", "ed", "ing", "er", "est", "ly", "d"):
+        forms.add(w + suf)
+
+    # 2) 以 e 结尾：去 e 再加
+    if w.endswith("e"):
+        for suf in ("ing", "ed", "es", "er", "est", "d", "ion", "ment", "able"):
+            forms.add(w[:-1] + suf)
+
+    # 3) 辅音 + y -> i + 后缀（同时保留 y + ing，如 carrying）
+    if len(w) > 2 and w.endswith("y") and w[-2] not in VOWELS:
+        for suf in ("ies", "ied", "ier", "iest", "ily"):
+            forms.add(w[:-1] + suf)
+        forms.add(w + "ing")
+
+    # 4) 单音节 CVC：双写末辅音（w/x/y 结尾不双写）
+    if (
+        len(w) >= 3
+        and w[-1] not in VOWELS
+        and w[-1] not in "wxy"
+        and w[-2] in VOWELS
+        and w[-3] not in VOWELS
+    ):
+        for suf in ("ing", "ed", "er", "est"):
+            forms.add(w + w[-1] + suf)
+
+    # 5) 常见派生后缀（名词化 / 形容词化）
+    for suf in ("tion", "sion", "ment", "ness", "ful", "less", "able", "ible",
+                "al", "ous", "ive", "ity", "ance", "ence"):
+        forms.add(w + suf)
+        if w.endswith("e"):
+            forms.add(w[:-1] + suf)
+
+    return {f for f in forms if f}
 
 
 def api_config() -> tuple[str, str, str]:
@@ -74,7 +240,18 @@ def book_of(shard: str) -> str:
 
 
 def variant_re(word: str) -> re.Pattern:
-    return re.compile(r"\b" + re.escape(word) + VARIANT_SUFFIX + r"\b", re.IGNORECASE)
+    """匹配该词及其常见词形。
+
+    长词（>=4 字母）额外允许出现在复合词内部 —— 否则 blackboard 里的 board、
+    classmate 里的 mate 会被判为「例句不含该词」。短词不放宽，避免 category
+    里的 cat 之类误判。
+    """
+    forms = sorted(inflections(word), key=len, reverse=True)
+    alt = "|".join(re.escape(f) for f in forms)
+    pattern = r"\b(?:" + alt + r")\b"
+    if len(word) >= 4:
+        pattern += "|" + re.escape(word)
+    return re.compile(pattern, re.IGNORECASE)
 
 
 def validate(entry: dict, item: dict) -> list[str]:
@@ -154,12 +331,36 @@ def parse_json_array(text: str) -> list[dict]:
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
     start, end = text.find("["), text.rfind("]")
-    if start < 0 or end <= start:
+    if start < 0:
         raise ValueError("输出不含 JSON 数组")
-    items = json.loads(text[start : end + 1])
-    if not isinstance(items, list):
-        raise ValueError("输出不是 JSON 数组")
-    return [it for it in items if isinstance(it, dict)]
+    if end <= start:
+        # 输出被 max_tokens 截断时不会有收尾的 ]。此时按文本末尾取 body，
+        # 交给下面的逐对象抢救，至少能拿回截断前已完整的那几个词。
+        end = len(text) - 1
+    body = text[start : end + 1]
+    try:
+        items = json.loads(body)
+        if isinstance(items, list):
+            return [it for it in items if isinstance(it, dict)]
+    except json.JSONDecodeError:
+        # 整批解析失败（输出被截断或混入坏字符）时逐个抢救对象，
+        # 一处坏字符不至于毁掉整批 40-60 个词。
+        pass
+
+    recovered: list[dict] = []
+    decoder = json.JSONDecoder()
+    i = body.find("{")
+    while i != -1:
+        try:
+            obj, nxt = decoder.raw_decode(body, i)
+            if isinstance(obj, dict):
+                recovered.append(obj)
+            i = body.find("{", max(nxt, i + 1))   # 成功：从对象末尾之后继续找
+        except json.JSONDecodeError:
+            i = body.find("{", i + 1)             # 失败：错开一位重试
+    if not recovered:
+        raise ValueError("输出不含可解析的 JSON 对象")
+    return recovered
 
 
 def main() -> int:
