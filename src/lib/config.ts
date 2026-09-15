@@ -15,6 +15,7 @@ export const SRS_CONFIG = {
   daily_new_max: 50,
   avalanche_ratio: 3, // 到期复习 > 每日新词×3 时自动暂停新词
   same_day_review: true, // 新词当天结束前的快速回顾
+  daily_review_cap: 150, // 每日复习上限，默认 150；0 表示不限（超出部分顺延到明天）
 } as const;
 
 // 游戏化参数

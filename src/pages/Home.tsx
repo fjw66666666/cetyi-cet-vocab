@@ -13,15 +13,20 @@ import { SRS_CONFIG } from '@/lib/config';
 
 export default function HomePage() {
   const state = useAppState();
-  const { due, news, paused, total, bookWords } = useTodayQueue();
+  const { due, news, paused, total, bookWords, dueTotal, deferred, evening } = useTodayQueue();
   const today = state.days[dateKey()] ?? { newLearned: 0, reviewed: 0, correct: 0, wrong: 0, seconds: 0, xp: 0 };
   const goal = state.settings.dailyNew;
   const doneNew = today.newLearned;
   const doneReview = today.reviewed;
-  const target = goal + Math.max(due.length, doneReview);
+  const cap = state.settings.dailyReviewCap ?? SRS_CONFIG.daily_review_cap;
+  // 今日复习目标 = 每日上限内的到期词 + 当天回顾词（与 due 去重）
+  const eveningExtra = evening.filter((id) => !due.includes(id)).length;
+  const reviewGoal = (cap <= 0 ? dueTotal : Math.min(dueTotal, cap)) + eveningExtra;
+  const goalTotal = reviewGoal + news.length;
   const finished = doneNew + doneReview;
-  const progress = target > 0 ? Math.min(1, finished / target) : 0;
-  const nothingToDo = due.length === 0 && news.length === 0;
+  const remaining = Math.max(0, goalTotal - finished);
+  const allDone = (reviewGoal === 0 && news.length === 0) || (goalTotal > 0 && finished >= goalTotal);
+  const progress = goalTotal > 0 ? Math.min(1, finished / goalTotal) : 0;
 
   // 每日重点词：热频 × 遗忘风险 Top 8
   const focusWords = useMemo(
@@ -44,19 +49,27 @@ export default function HomePage() {
                 {state.activeBook} · 高频词 {SRS_CONFIG.daily_new_default === goal ? '优先' : ''}
               </div>
               <div className="mt-1 text-3xl font-semibold tracking-tight">
-                今日待复习 <CountUp value={due.length} className="neon-text font-mono" /> 词
+                今日待复习 <CountUp value={reviewGoal} className="neon-text font-mono" /> 词
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                {paused
-                  ? `复习量较大，新词已自动暂停（防雪崩）`
-                  : `新词 ${Math.max(0, goal - doneNew)} / ${goal} · 复习 ${doneReview}/${due.length}`}
+                {allDone
+                  ? '今日任务已完成 ✓'
+                  : paused
+                    ? `复习量较大，新词已自动暂停（防雪崩）`
+                    : `今日目标 ${finished}/${goalTotal} 词 · 还剩 ${remaining}`}
               </div>
+              {allDone && deferred > 0 && (
+                <div className="mt-1 text-xs text-muted-foreground">另有 {deferred} 词顺延到明天（今日已达标，不必清空）</div>
+              )}
+              {!allDone && cap > 0 && deferred > 0 && (
+                <div className="mt-1 text-xs text-muted-foreground">已达每日复习上限 {cap} 词，另有 {deferred} 词顺延到明天</div>
+              )}
             </div>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-48">
-            {due.length > 0 ? (
+            {reviewGoal > 0 ? (
               <Link to="/review" className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-medium text-primary-foreground transition-transform hover:opacity-95 active:scale-[0.98]">
-                <Play className="h-4 w-4" /> 先复习 {due.length} 词
+                <Play className="h-4 w-4" /> 先复习 {reviewGoal} 词
               </Link>
             ) : (
               <Link to="/review" className="flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-medium text-muted-foreground">
@@ -68,7 +81,7 @@ export default function HomePage() {
                 <Sparkles className="h-4 w-4" /> 学新词 {news.length} 个
               </Link>
             )}
-            {nothingToDo && (
+            {allDone && (
               <div className="rounded-xl bg-secondary px-4 py-3 text-center text-sm text-muted-foreground">
                 今日任务已完成，明天见！
               </div>

@@ -68,8 +68,8 @@ export function SpeakerButton({ text, size = 'md', className }: { text: string; 
   );
 }
 
-/** 三档自评按钮（固定于移动端拇指热区） */
-export function GradeButtons({ onGrade, disabled }: { onGrade: (g: Grade) => void; disabled?: boolean }) {
+/** 三档自评按钮（固定于移动端拇指热区）；highlight 用于高亮推荐档位（可选，不传则行为不变） */
+export function GradeButtons({ onGrade, disabled, highlight }: { onGrade: (g: Grade) => void; disabled?: boolean; highlight?: Grade }) {
   return (
     <div className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 backdrop-blur">
       <div className="mx-auto grid max-w-xl grid-cols-3 gap-3 p-4">
@@ -77,7 +77,10 @@ export function GradeButtons({ onGrade, disabled }: { onGrade: (g: Grade) => voi
           type="button"
           disabled={disabled}
           onClick={() => onGrade(0)}
-          className="rounded-xl border border-destructive/40 bg-destructive/10 py-3.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 active:scale-[0.98] disabled:opacity-40"
+          className={cn(
+            'rounded-xl border border-destructive/40 bg-destructive/10 py-3.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 active:scale-[0.98] disabled:opacity-40',
+            highlight === 0 && 'ring-2 ring-primary ring-offset-2',
+          )}
         >
           忘记
           <span className="mt-0.5 block text-[11px] opacity-70">10 分钟后重学</span>
@@ -86,7 +89,10 @@ export function GradeButtons({ onGrade, disabled }: { onGrade: (g: Grade) => voi
           type="button"
           disabled={disabled}
           onClick={() => onGrade(1)}
-          className="rounded-xl border border-amber-500/40 bg-amber-500/10 py-3.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-500/20 active:scale-[0.98] disabled:opacity-40 dark:text-amber-400"
+          className={cn(
+            'rounded-xl border border-amber-500/40 bg-amber-500/10 py-3.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-500/20 active:scale-[0.98] disabled:opacity-40 dark:text-amber-400',
+            highlight === 1 && 'ring-2 ring-primary ring-offset-2',
+          )}
         >
           模糊
           <span className="mt-0.5 block text-[11px] opacity-70">间隔降一档</span>
@@ -95,7 +101,10 @@ export function GradeButtons({ onGrade, disabled }: { onGrade: (g: Grade) => voi
           type="button"
           disabled={disabled}
           onClick={() => onGrade(2)}
-          className="rounded-xl border border-primary/40 bg-primary/10 py-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 active:scale-[0.98] disabled:opacity-40"
+          className={cn(
+            'rounded-xl border border-primary/40 bg-primary/10 py-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 active:scale-[0.98] disabled:opacity-40',
+            highlight === 2 && 'ring-2 ring-primary ring-offset-2',
+          )}
         >
           认识
           <span className="mt-0.5 block text-[11px] opacity-70">间隔升级</span>

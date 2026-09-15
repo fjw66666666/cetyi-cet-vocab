@@ -24,6 +24,7 @@ export default function SettingsPage() {
   };
 
   const dateStr = new Date().toISOString().slice(0, 10);
+  const reviewCap = s.dailyReviewCap ?? SRS_CONFIG.daily_review_cap;
 
   // 导出当前词书的全部单词为 JSON
   const exportVocab = () => {
@@ -80,6 +81,32 @@ export default function SettingsPage() {
             <span>到期复习超过 {s.dailyNew * SRS_CONFIG.avalanche_ratio} 词时自动暂停新词</span>
             <span>{SRS_CONFIG.daily_new_max}</span>
           </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-sm">
+            <span>每日复习上限</span>
+            <span className="font-medium text-primary">{reviewCap === 0 ? '不限' : `${reviewCap} 词/天`}</span>
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-2">
+            {([
+              { value: 80, label: '80' },
+              { value: 150, label: '150' },
+              { value: 250, label: '250' },
+              { value: 0, label: '不限' },
+            ]).map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => store.setSettings({ dailyReviewCap: value })}
+                className={cn(
+                  'rounded-xl border py-2 text-sm transition-colors',
+                  reviewCap === value ? 'border-primary bg-primary/10 font-medium text-primary' : 'text-muted-foreground',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">超出上限的到期词会顺延到明天，不必当天清空</p>
         </div>
       </section>
 

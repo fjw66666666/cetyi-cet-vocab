@@ -30,26 +30,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'streak-7', name: '连续 7 天', desc: '连续学习 7 天', icon: 'Flame', test: (s) => s.streak.best >= 7 },
   { id: 'streak-30', name: '月度铁人', desc: '连续学习 30 天', icon: 'Crown', test: (s) => s.streak.best >= 30 },
   { id: 'perfect-day', name: '百发百中', desc: '单日测验 20 题以上且全对', icon: 'Target', test: (s) => Object.values(s.days).some((d) => d.correct >= 20 && d.wrong === 0) },
-  { id: 'early-bird', name: '早起的鸟', desc: '在 8 点前完成学习', icon: 'Sunrise', test: (s) => Object.keys(s.days).some((k) => s.days[k].newLearned + s.days[k].reviewed > 0 && new Date(k + 'T08:00:00').getTime() > 0 && earlyCheck(s)) },
-  { id: 'night-owl', name: '深夜书房', desc: '在 23 点后仍在学习', icon: 'Moon', test: (s) => lateCheck(s) },
+  // 时间维度依据 DayLog 的真实首/末作答小时判定（见 types.DayLog.firstHour/lastHour）
+  { id: 'early-bird', name: '早起的鸟', desc: '在 8 点前完成学习', icon: 'Sunrise', test: (s) => Object.values(s.days).some((d) => d.firstHour !== undefined && d.firstHour < 8 && d.newLearned + d.reviewed > 0) },
+  { id: 'night-owl', name: '深夜书房', desc: '在 23 点后仍在学习', icon: 'Moon', test: (s) => Object.values(s.days).some((d) => d.lastHour !== undefined && d.lastHour >= 23 && d.newLearned + d.reviewed > 0) },
   { id: 'vocab-test', name: '知己知彼', desc: '完成一次词汇量小测', icon: 'Ruler', test: (s) => s.vocabTests.length >= 1 },
   { id: 'week-active', name: '七日全勤', desc: '累计 7 天有学习记录', icon: 'CalendarCheck', test: (s) => totalDays(s) >= 7 },
 ];
-
-// 早晚打卡需要时间维度，简化实现：以当日日志存在且 localStorage 中记录的首次时间戳判断
-// 这里用近似：只要当天产生过学习行为，就按当前小时在写入时判断（在 grade 中由 checkAchievements 间接触发）
-function earlyCheck(s: AppState): boolean {
-  return Boolean((s as unknown as { __early?: boolean }).__early);
-}
-function lateCheck(s: AppState): boolean {
-  return Boolean((s as unknown as { __late?: boolean }).__late);
-}
-
-export function markHourFlags(s: AppState, hour: number) {
-  const anyS = s as unknown as { __early?: boolean; __late?: boolean };
-  if (hour < 8) anyS.__early = true;
-  if (hour >= 23) anyS.__late = true;
-}
 
 export function checkAchievements(s: AppState): string[] {
   const unlocked = new Set(s.achievements);

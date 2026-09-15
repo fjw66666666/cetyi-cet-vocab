@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Bookmark, ChevronDown, Search, Slash } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Bookmark, ChevronDown, Search, Slash, Target } from 'lucide-react';
 import { SpeakerButton } from '@/components/ui-bits';
 import { HeatBadge } from '@/components/HeatBadge';
 import { useWords } from '@/hooks/useWords';
 import { store, useAppState } from '@/lib/store';
 import { searchWords, wordsOfBook } from '@/lib/wordbank';
 import { heatGrade, isHot } from '@/lib/priority';
+import { memoryStrength, strengthLabel, daysRetained } from '@/lib/memory';
 import { cn } from '@/lib/utils';
 import type { Book, WordEntry } from '@/lib/types';
 
 type Filter = 'all' | 'hot' | 'starred' | 'wrong' | 'slain' | 'learning';
+type SortKey = 'default' | 'weak' | 'strong' | 'recent';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -20,13 +23,29 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'slain', label: '已斩词' },
 ];
 
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'default', label: '默认' },
+  { key: 'weak', label: '记忆最弱' },
+  { key: 'strong', label: '记忆最牢' },
+  { key: 'recent', label: '最近加入' },
+];
+
 const TIER_LABEL = ['高频', '核心', '大纲'];
+
+const STRENGTH_BAR: Record<'danger' | 'warn' | 'info' | 'good', string> = {
+  danger: 'bg-destructive',
+  warn: 'bg-amber-500',
+  info: 'bg-primary',
+  good: 'bg-emerald-500',
+};
 
 export default function LibraryPage() {
   const all = useWords();
   const state = useAppState();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [sort, setSort] = useState<SortKey>('default');
   const [openId, setOpenId] = useState<string | null>(null);
   const [visible, setVisible] = useState(80);
 
@@ -34,7 +53,7 @@ export default function LibraryPage() {
     const base: WordEntry[] = query.trim()
       ? searchWords(all, query, state.activeBook)
       : wordsOfBook(all, state.activeBook);
-    return base.filter((w) => {
+    const filtered = base.filter((w) => {
       const r = state.records[w.id];
       switch (filter) {
         case 'starred': return r?.starred;
@@ -45,11 +64,33 @@ export default function LibraryPage() {
         default: return true;
       }
     });
-  }, [all, query, state.activeBook, state.records, filter]);
+    const ranked = [...filtered];
+    // 排序：有记录且已学的词才有强度；未学词在「最弱/最牢」排序中分别置于两端语义（均排最后）
+    const hasStrength = (id: string): boolean => {
+      const r = state.records[id];
+      return !!r && r.status !== 'new';
+    };
+    if (sort === 'weak') {
+      ranked.sort((a, b) => {
+        const va = hasStrength(a.id) ? memoryStrength(state.records[a.id]) : Number.POSITIVE_INFINITY;
+        const vb = hasStrength(b.id) ? memoryStrength(state.records[b.id]) : Number.POSITIVE_INFINITY;
+        return va - vb;
+      });
+    } else if (sort === 'strong') {
+      ranked.sort((a, b) => {
+        const va = hasStrength(a.id) ? memoryStrength(state.records[a.id]) : Number.NEGATIVE_INFINITY;
+        const vb = hasStrength(b.id) ? memoryStrength(state.records[b.id]) : Number.NEGATIVE_INFINITY;
+        return vb - va;
+      });
+    } else if (sort === 'recent') {
+      ranked.sort((a, b) => (state.records[b.id]?.created_at ?? 0) - (state.records[a.id]?.created_at ?? 0));
+    }
+    return ranked; // default 保持 wordsOfBook 原序
+  }, [all, query, state.activeBook, state.records, filter, sort]);
 
-  // 筛选/搜索/切换词书时重置分页
+  // 筛选/搜索/切换词书/切换排序时重置分页
   const visibleList = list.slice(0, visible);
-  const resetKey = `${query}|${filter}|${state.activeBook}`;
+  const resetKey = `${query}|${filter}|${state.activeBook}|${sort}`;
   const [lastKey, setLastKey] = useState(resetKey);
   if (lastKey !== resetKey) {
     setLastKey(resetKey);
@@ -112,6 +153,30 @@ export default function LibraryPage() {
         ))}
       </div>
 
+      {/* 排序 + 薄弱词入口 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSort(s.key)}
+              className={cn(
+                'shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                sort === s.key ? 'border-primary bg-primary/10 font-medium text-primary' : 'text-muted-foreground',
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => navigate('/review?weak=1')}
+          className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+        >
+          <Target className="h-3.5 w-3.5" /> 薄弱词优先复习
+        </button>
+      </div>
+
       {/* 单词列表（分页渲染，避免大词库卡顿） */}
       <div className="space-y-2">
         {list.length === 0 && (
@@ -139,6 +204,19 @@ export default function LibraryPage() {
                     </span>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{w.pos} {w.meanings[0]}</p>
+                  {r && r.status !== 'new' && !r.slain && (() => {
+                    const v = memoryStrength(r);
+                    const { label, tone } = strengthLabel(v);
+                    return (
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
+                          <div className={cn('h-full rounded-full', STRENGTH_BAR[tone])} style={{ width: `${v}%` }} />
+                        </div>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{label} · ≈ 还能记住 {daysRetained(r)} 天</span>
+                      </div>
+                    );
+                  })()}
+                  {r?.slain && <span className="mt-1 inline-block rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">已斩</span>}
                 </div>
                 <SpeakerButton text={w.word} size="sm" />
                 <button

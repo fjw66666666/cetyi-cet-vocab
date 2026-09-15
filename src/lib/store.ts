@@ -1,9 +1,9 @@
 // 本地持久化存储 + 可订阅状态（localStorage 实现，结构预留 user_id 便于云端扩展）
 import { useSyncExternalStore } from 'react';
-import { SRS_CONFIG } from './config';
+import { SRS_CONFIG, XP_RULES } from './config';
 import type { AppState, DayLog, Grade, ReadingArticleState, Settings, VocabTest } from './types';
 import { createRecord, schedule } from './sm2';
-import { checkAchievements, markHourFlags } from './gamification';
+import { checkAchievements } from './gamification';
 
 const KEY = 'cetyi.v1';
 
@@ -22,6 +22,7 @@ function defaultState(): AppState {
       dark: 'dark', // 默认深空主题（已有用户设置不受 load() 合并影响）
       notify: false,
       notifyHour: 20,
+      dailyReviewCap: SRS_CONFIG.daily_review_cap,
     },
     records: {},
     days: {},
@@ -34,16 +35,28 @@ function defaultState(): AppState {
   };
 }
 
+/** 历史遗留的临时字段类型：旧版本曾把 __early/__late 直接写进 state，需在加载/导入时清除 */
+type LegacyState = AppState & { __early?: boolean; __late?: boolean };
+
+/** 清除历史遗留的临时字段，保证导出/持久化的 JSON 干净且可再次导入 */
+function stripLegacy(p: AppState): AppState {
+  const copy = { ...p } as LegacyState;
+  delete copy.__early;
+  delete copy.__late;
+  return copy;
+}
+
 function load(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
     const parsed = JSON.parse(raw) as AppState;
+    const clean = stripLegacy(parsed);
     return {
       ...defaultState(),
-      ...parsed,
-      settings: { ...defaultState().settings, ...parsed.settings },
-      reading: { articles: { ...(parsed.reading?.articles ?? {}) } },
+      ...clean,
+      settings: { ...defaultState().settings, ...clean.settings },
+      reading: { articles: { ...(clean.reading?.articles ?? {}) } },
     };
   } catch {
     return defaultState();
@@ -94,13 +107,16 @@ class AppStore {
       s.records[wordId] = rec;
 
       const dk = dateKey(now);
-      markHourFlags(s, new Date(now).getHours());
       const day: DayLog = s.days[dk] ?? { newLearned: 0, reviewed: 0, correct: 0, wrong: 0, seconds: 0, xp: 0 };
+      // 记录当天真实首/末作答小时（firstHour 首次写入后不再更新），供「早起的鸟/深夜书房」判定
+      const hour = new Date(now).getHours();
+      if (day.firstHour === undefined) day.firstHour = hour;
+      day.lastHour = hour;
       if (opts.isNew) day.newLearned += 1;
       else day.reviewed += 1;
       if (opts.quizCorrect === true) day.correct += 1;
       if (opts.quizCorrect === false) day.wrong += 1;
-      const gained = opts.xpBase + (opts.quizCorrect ? 3 : 0);
+      const gained = opts.xpBase + (opts.quizCorrect ? XP_RULES.quiz_correct : 0);
       day.xp += gained;
       s.xp += gained;
       s.days[dk] = day;
@@ -232,7 +248,8 @@ class AppStore {
     try {
       const parsed = JSON.parse(raw) as AppState;
       if (!parsed.user_id || !parsed.settings) return false;
-      this.commit({ ...defaultState(), ...parsed });
+      const cleaned = stripLegacy(parsed);
+      this.commit({ ...defaultState(), ...cleaned, settings: { ...defaultState().settings, ...cleaned.settings } });
       return true;
     } catch {
       return false;

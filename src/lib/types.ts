@@ -53,6 +53,10 @@ export interface DayLog {
   wrong: number;
   seconds: number;
   xp: number;
+  firstHour?: number; // 当天首次作答的小时（0–23）；仅新数据写入，旧数据为 undefined
+  lastHour?: number; // 当天最后一次作答的小时（0–23）；同上
+  // 注：不采用 hours?: number[]——firstHour/lastHour 已足以支撑「早起的鸟/深夜书房」两枚徽章，
+  //     记录整段小时数组只会放大每次 grade 的 localStorage 写入体积，收益为零。
 }
 
 export interface Settings {
@@ -61,6 +65,7 @@ export interface Settings {
   dark: 'light' | 'dark' | 'auto';
   notify: boolean;
   notifyHour: number; // 提醒小时（本地时间）
+  dailyReviewCap?: number; // 每日复习上限（80/150/250；0 表示不限）；旧数据缺失时按 SRS_CONFIG.daily_review_cap 处理
 }
 
 export interface VocabTest {

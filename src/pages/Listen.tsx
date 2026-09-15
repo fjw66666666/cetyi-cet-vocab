@@ -12,16 +12,16 @@ import type { WordEntry } from '@/lib/types';
 export default function ListenPage() {
   const all = useWords();
   const state = useAppState();
-  const { due, news, bookWords } = useTodayQueue();
+  const { dueAll, news, bookWords } = useTodayQueue();
 
   const playlist = useMemo<WordEntry[]>(() => {
     const todayLearned = Object.entries(state.learnedAt)
       .filter(([, ts]) => dateKey(ts) === dateKey())
       .map(([id]) => id);
-    const ids = [...new Set([...due, ...news, ...todayLearned])];
+    const ids = [...new Set([...dueAll, ...news, ...todayLearned])];
     const list = ids.map((id) => all.get(id)).filter(Boolean) as WordEntry[];
     return list.length > 0 ? list : bookWords.slice(0, 30);
-  }, [all, due, news, state.learnedAt, bookWords]);
+  }, [all, dueAll, news, state.learnedAt, bookWords]);
 
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(false);

@@ -13,7 +13,7 @@ const STATUS_META = [
 
 export default function StatsPage() {
   const state = useAppState();
-  const { total, due } = useTodayQueue();
+  const { total, dueTotal } = useTodayQueue();
 
   const today = state.days[dateKey()] ?? { newLearned: 0, reviewed: 0, correct: 0, wrong: 0, seconds: 0, xp: 0 };
 
@@ -88,7 +88,7 @@ export default function StatsPage() {
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="今日新词" value={today.newLearned} />
-        <StatCard label="今日复习" value={today.reviewed} sub={`待复习 ${due.length}`} />
+        <StatCard label="今日复习" value={today.reviewed} sub={`待复习 ${dueTotal}`} />
         <StatCard
           label="今日正确率"
           value={today.correct + today.wrong > 0 ? `${Math.round((today.correct / (today.correct + today.wrong)) * 100)}%` : '—'}

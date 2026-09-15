@@ -158,22 +158,30 @@ export function pickNewWords(
 }
 
 /**
- * 今日任务 = 到期复习（始终优先）+ 适量新词（防复习雪崩）
- * 返回 { due, news, paused } — paused=true 表示因复习量过大暂停新词
+ * 今日任务 = 到期复习（始终优先，受每日上限截断）+ 适量新词（防复习雪崩）
+ * 返回 { due, news, paused, dueTotal, deferred }
+ * - due：截断后的到期复习词（仍按 next_review_at 升序，最久未复习优先）
+ * - paused：防雪崩，判断基于截断前的到期总数（语义与改动前一致）
+ * - dueTotal / deferred：截断前总数 / 被顺延到明天的数量
  */
 export function buildTodayQueue(
   words: WordEntry[],
   records: Record<string, MemoryRecord>,
   dailyNew: number,
   now: number,
-): { due: string[]; news: string[]; paused: boolean } {
-  const due = dueWords(records, now);
-  const paused = due.length > dailyNew * SRS_CONFIG.avalanche_ratio;
+  cap: number,
+): { due: string[]; news: string[]; paused: boolean; dueTotal: number; deferred: number } {
+  const dueAll = dueWords(records, now);
+  const dueTotal = dueAll.length;
+  const effective = cap <= 0 ? dueTotal : Math.min(cap, dueTotal);
+  const due = dueAll.slice(0, effective);
+  const deferred = dueTotal - due.length;
+  const paused = dueTotal > dailyNew * SRS_CONFIG.avalanche_ratio;
   let news: string[] = [];
   if (!paused) {
     news = pickNewWords(words, records, dailyNew, now);
   }
-  return { due, news, paused };
+  return { due, news, paused, dueTotal, deferred };
 }
 
 /** 今天是否还需要「当天结束回顾」（新词学过且 10 分钟回顾已完成） */
@@ -182,4 +190,24 @@ export function needsEveningReview(rec: MemoryRecord, now: number): boolean {
   const createdDay = new Date(rec.created_at).toDateString();
   const today = new Date(now).toDateString();
   return createdDay === today && rec.reps >= 1 && rec.next_review_at <= now;
+}
+
+/**
+ * 当天回顾队列：今天首次学过的词 ∧ 已到回顾时间（纯函数，不修改任何调度）。
+ * 复用 needsEveningReview；时间一律由参数 now 传入。
+ */
+export function buildEveningQueue(
+  records: Record<string, MemoryRecord>,
+  learnedAt: Record<string, number>,
+  now: number,
+): string[] {
+  if (!SRS_CONFIG.same_day_review) return [];
+  const today = new Date(now).toDateString();
+  const out: string[] = [];
+  for (const [wordId, ts] of Object.entries(learnedAt)) {
+    if (new Date(ts).toDateString() !== today) continue;
+    const rec = records[wordId];
+    if (rec && needsEveningReview(rec, now)) out.push(wordId);
+  }
+  return out;
 }

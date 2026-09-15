@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, CheckCircle2, Ear, Pencil, Type } from 'lucide-react';
 import { GradeButtons, SpeakerButton } from '@/components/ui-bits';
 import { HeatBadge } from '@/components/HeatBadge';
 import { useTodayQueue } from '@/hooks/useQueue';
 import { useWords } from '@/hooks/useWords';
-import { store, useAppState } from '@/lib/store';
+import { dateKey, store, useAppState } from '@/lib/store';
 import { prioritizeDue } from '@/lib/priority';
+import { shuffle, pickDistractors } from '@/lib/quiz';
+import { memoryStrength } from '@/lib/memory';
+import { dueWords } from '@/lib/sm2';
 import { speak } from '@/lib/speech';
 import { WRONG_PASS_STREAK, XP_RULES } from '@/lib/config';
 import { cn } from '@/lib/utils';
@@ -22,50 +25,48 @@ interface Question {
   cloze?: { before: string; after: string; zh: string };
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  return [...arr].sort(() => Math.random() - 0.5);
-}
-
-function pickDistractors(word: WordEntry, pool: WordEntry[], n: number): WordEntry[] {
-  const sameTier = pool.filter((w) => w.id !== word.id && w.tier === word.tier);
-  const rest = pool.filter((w) => w.id !== word.id && w.tier !== word.tier);
-  return shuffle([...sameTier, ...rest]).slice(0, n);
-}
-
 function makeQuestion(word: WordEntry, pool: WordEntry[]): Question {
+  // cloze 与 en2zh 权重相当（各 1 次，见 HANDOFF §7.1 第 3 条）
   const types: QType[] = ['en2zh', 'zh2en', 'listen', 'spell'];
   if (word.example) types.push('cloze');
-  const type = types[Math.floor(Math.random() * types.length)];
-  const distractors = pickDistractors(word, pool, 3);
+  let type = types[Math.floor(Math.random() * types.length)];
 
+  if (type === 'cloze' && word.example) {
+    // 转义正则特殊字符，避免词中含 . * + ? 等元字符时匹配异常
+    const escaped = word.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`\\b${escaped}[a-z]*\\b`, 'i');
+    const m = word.example.en.match(re);
+    if (!m) {
+      type = 'zh2en'; // 例句中匹配不到该词（词形不符）→ 降级
+    } else {
+      const hit = m[0];
+      const at = word.example.en.indexOf(hit); // 用 indexOf/slice，避免 split 命中多次时错位
+      const before = word.example.en.slice(0, at);
+      const after = word.example.en.slice(at + hit.length);
+      if ((before + after).toLowerCase().includes(word.word.toLowerCase())) {
+        type = 'zh2en'; // 句中还有第二处该词 → 仍会泄漏答案，降级
+      } else {
+        // 不再生成 options，作答阶段 DOM 中不含答案字符串
+        return { type: 'cloze', word, cloze: { before, after, zh: word.example.zh } };
+      }
+    }
+  }
   if (type === 'zh2en') {
     return {
       type,
       word,
       promptMeaning: word.meanings.join('；'),
-      options: shuffle([word, ...distractors]).map((w) => ({ key: w.id, text: w.word, correct: w.id === word.id })),
+      options: shuffle([word, ...pickDistractors(word, pool, 3)]).map((w) => ({ key: w.id, text: w.word, correct: w.id === word.id })),
     };
   }
   if (type === 'spell') {
     return { type, word, promptMeaning: word.meanings.join('；') };
   }
-  if (type === 'cloze' && word.example) {
-    const re = new RegExp(`\\b${word.word}\\w*\\b`, 'i');
-    const m = word.example.en.match(re);
-    const hit = m?.[0] ?? word.word;
-    const [before, after] = word.example.en.split(hit);
-    return {
-      type,
-      word,
-      cloze: { before, after, zh: word.example.zh },
-      options: shuffle([word, ...distractors]).map((w) => ({ key: w.id, text: w.word, correct: w.id === word.id })),
-    };
-  }
   // en2zh / listen 共用中文选项
   return {
     type,
     word,
-    options: shuffle([word, ...distractors]).map((w) => ({
+    options: shuffle([word, ...pickDistractors(word, pool, 3)]).map((w) => ({
       key: w.id,
       text: `${w.pos ?? ''} ${w.meanings[0]}`,
       correct: w.id === word.id,
@@ -85,14 +86,36 @@ export default function ReviewPage() {
   const all = useWords();
   const state = useAppState();
   const navigate = useNavigate();
-  const { due, bookWords } = useTodayQueue();
+  const [searchParams] = useSearchParams();
+  const { due, bookWords, deferred, evening } = useTodayQueue();
 
-  // 会话队列：due（错词本 ∧ 热度 S/A 置顶）+ 中途追加的「模糊/忘记」重测
-  const [queue, setQueue] = useState<string[]>(() => prioritizeDue(due, state.records, all));
+  // 薄弱词会话（/review?weak=1）：按记忆强度升序取最弱的一批已学词
+  const weak = searchParams.get('weak') === '1';
+  const weakN = Math.max(1, Number(searchParams.get('n') ?? 30) || 30);
+
+  // 会话队列（惰性初始化，仅挂载时算一次）：薄弱会话 > （当天回顾 + 到期复习）
+  const [queue, setQueue] = useState<string[]>(() => {
+    if (weak) {
+      return [...all.values()]
+        .filter((w) => {
+          const r = state.records[w.id];
+          return !!r && r.status !== 'new' && !r.slain;
+        })
+        .sort((a, b) => memoryStrength(state.records[a.id]) - memoryStrength(state.records[b.id]))
+        .slice(0, weakN)
+        .map((w) => w.id);
+    }
+    const base = prioritizeDue(due, state.records, all);
+    const ev = evening.filter((id) => all.has(id) && !base.includes(id));
+    return [...ev, ...base];
+  });
+  const [eveningIds] = useState(() => new Set(evening));
+
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState<'answering' | 'revealed'>('answering');
   const [picked, setPicked] = useState<string | null>(null);
   const [spellInput, setSpellInput] = useState('');
+  const [clozeInput, setClozeInput] = useState('');
   const [quizCorrect, setQuizCorrect] = useState<boolean | null>(null);
   const [wrongPass, setWrongPass] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({ done: 0, correct: 0 });
@@ -109,21 +132,30 @@ export default function ReviewPage() {
     };
   }, [start]);
 
-  // 听音辨义自动播放；拼写聚焦
+  // 听音辨义自动播放；拼写 / 填空聚焦输入框
   useEffect(() => {
     if (!question) return;
     if (question.type === 'listen') {
       const t = setTimeout(() => speak(question.word.word, store.get().settings.voice), 350);
       return () => clearTimeout(t);
     }
-    if (question.type === 'spell') inputRef.current?.focus();
+    if (question.type === 'spell' || question.type === 'cloze') inputRef.current?.focus();
   }, [question]);
 
-  if (due.length === 0) {
+  // 「再来一组」：把被每日上限顺延的词追加进当前会话（仅会话内，不改变今日达标状态）
+  const onMore = () => {
+    const allDue = dueWords(state.records, start);
+    const extra = allDue.slice(due.length, due.length + Math.min(30, deferred));
+    setQueue((q) => [...q, ...extra.filter((id) => !q.includes(id))]);
+  };
+
+  if (queue.length === 0) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <CheckCircle2 className="h-14 w-14 text-primary" />
-        <p className="text-muted-foreground">现在没有到期的复习任务。</p>
+        <p className="text-muted-foreground">
+          {weak ? '还没有足够的已学词来生成薄弱词列表。' : '现在没有到期的复习任务。'}
+        </p>
         <Link to="/" className="rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground">返回首页</Link>
       </div>
     );
@@ -131,17 +163,27 @@ export default function ReviewPage() {
 
   if (!question || !word) {
     const passCount = Object.values(wrongPass).filter((c) => c >= WRONG_PASS_STREAK).length;
+    const tomorrowDue = Object.values(state.records).filter((r) => dateKey(r.next_review_at) === dateKey(start + 86400_000)).length;
+    const moreN = Math.min(30, deferred);
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 p-6 text-center">
         <CheckCircle2 className="h-16 w-16 animate-pop text-primary" />
-        <h1 className="text-2xl font-semibold">复习完成！</h1>
+        <h1 className="text-2xl font-semibold">今日任务完成 ✓</h1>
         <p className="text-sm text-muted-foreground">
           共 {stats.done} 题 · 首答正确率 {stats.done ? Math.round((stats.correct / stats.done) * 100) : 0}%
           {Object.keys(wrongPass).length > 0 && ` · 错词通过 ${passCount}/${Object.keys(wrongPass).length}`}
         </p>
-        <button onClick={() => navigate('/')} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground">
-          回首页
-        </button>
+        <p className="text-xs text-muted-foreground">明天预计到期 {tomorrowDue} 词</p>
+        <div className="flex flex-col gap-2">
+          {moreN > 0 && (
+            <button onClick={onMore} className="rounded-xl border px-6 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              再来一组 {moreN} 词
+            </button>
+          )}
+          <button onClick={() => navigate('/')} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground">
+            回首页
+          </button>
+        </div>
       </div>
     );
   }
@@ -171,6 +213,7 @@ export default function ReviewPage() {
     setPhase('answering');
     setPicked(null);
     setSpellInput('');
+    setClozeInput('');
     setQuizCorrect(null);
     setIdx((i) => i + 1);
   };
@@ -180,12 +223,19 @@ export default function ReviewPage() {
     reveal(ok, spellInput.trim());
   };
 
+  const submitCloze = () => {
+    const ok = clozeInput.trim().toLowerCase() === word.word.toLowerCase();
+    reveal(ok, clozeInput.trim());
+  };
+
   return (
     <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-36 pt-4">
       <div className="flex items-center justify-between">
         <Link to="/" className="rounded-full p-2 text-muted-foreground hover:bg-secondary"><ArrowLeft className="h-5 w-5" /></Link>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs">{TYPE_LABEL[question.type]}</span>
+          {weak && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">薄弱强化</span>}
+          {word && eveningIds.has(word.id) && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">当天回顾</span>}
           {idx + 1}/{queue.length}
         </div>
         <div className="w-9" />
@@ -264,16 +314,48 @@ export default function ReviewPage() {
             <div className="space-y-3 text-left">
               <p className="text-base leading-relaxed">
                 {question.cloze.before}
-                <span className={cn(
-                  'mx-1 inline-block min-w-16 rounded border-b-2 px-1 text-center font-word font-bold',
-                  phase === 'revealed' ? (quizCorrect ? 'border-primary text-primary' : 'border-destructive text-destructive') : 'border-primary/60 text-transparent',
-                )}>
-                  {phase === 'revealed' ? word.word : word.word}
-                </span>
+                {phase === 'revealed' ? (
+                  <span className={cn(
+                    'mx-1 inline-block min-w-16 rounded border-b-2 px-1 text-center font-word font-bold',
+                    quizCorrect ? 'border-primary text-primary' : 'border-destructive text-destructive',
+                  )}>
+                    {word.word}
+                  </span>
+                ) : (
+                  <span aria-hidden="true" className="mx-1 inline-block w-20 border-b-2 border-primary/60 align-middle" />
+                )}
                 {question.cloze.after}
               </p>
               <p className="text-sm text-muted-foreground">{question.cloze.zh}</p>
-              <p className="text-xs text-muted-foreground">选出空格中应填的词</p>
+              {phase === 'answering' && (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    提示：{word.word.length} 个字母，{word.word[0].toUpperCase()} {'_ '.repeat(Math.max(0, word.word.length - 1)).trim()}
+                  </p>
+                  <div className="mx-auto flex max-w-xs items-center gap-2">
+                    <Type className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <input
+                      ref={inputRef}
+                      value={clozeInput}
+                      onChange={(e) => setClozeInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && clozeInput.trim()) submitCloze(); }}
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="w-full rounded-xl border bg-background px-4 py-3 text-center font-word text-lg outline-none focus:ring-2 focus:ring-ring"
+                      placeholder="填入空缺的单词"
+                    />
+                  </div>
+                  <button
+                    onClick={submitCloze}
+                    disabled={!clozeInput.trim()}
+                    className="mx-auto flex items-center gap-1.5 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40"
+                  >
+                    <Pencil className="h-4 w-4" /> 核对
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
