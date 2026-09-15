@@ -26,3 +26,7 @@ node_modules/
 dist/
 *.log
 *.pid
+
+# 词库补全脚本的本机断点状态（非仓库资产，随机器而异）
+scripts/.enrich-progress.jsonl
+scripts/.enrich-rejects.jsonl

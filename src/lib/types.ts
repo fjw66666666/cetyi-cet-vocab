@@ -1,7 +1,7 @@
 // 全局类型定义
 
 export type Book = 'CET4' | 'CET6';
-/** 词汇层级：0 真题高频 / 1 核心 / 2 大纲 */
+/** 词汇层级：0 四六级真题高频（最该先学，约 900 词/书）/ 1 大纲核心 / 2 大纲长尾 */
 export type Tier = 0 | 1 | 2;
 
 /** 热度档位：由 fs 映射（见 lib/priority.ts heatGrade） */
