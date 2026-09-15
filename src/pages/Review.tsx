@@ -22,7 +22,7 @@ interface Question {
   word: WordEntry;
   options?: { key: string; text: string; correct: boolean }[];
   promptMeaning?: string;
-  cloze?: { before: string; after: string; zh: string };
+  cloze?: { before: string; after: string; zh: string; suffix: string };
 }
 
 function makeQuestion(word: WordEntry, pool: WordEntry[]): Question {
@@ -43,11 +43,14 @@ function makeQuestion(word: WordEntry, pool: WordEntry[]): Question {
       const at = word.example.en.indexOf(hit); // 用 indexOf/slice，避免 split 命中多次时错位
       const before = word.example.en.slice(0, at);
       const after = word.example.en.slice(at + hit.length);
+      // hit 可能带词形变化后缀（例句 confirmed ← 词条 confirm）。后缀必须保留在空白之后，
+      // 否则揭示时会渲染成 "The test confirm her progress." 这种语法被破坏的句子。
+      const suffix = hit.slice(word.word.length);
       if ((before + after).toLowerCase().includes(word.word.toLowerCase())) {
         type = 'zh2en'; // 句中还有第二处该词 → 仍会泄漏答案，降级
       } else {
         // 不再生成 options，作答阶段 DOM 中不含答案字符串
-        return { type: 'cloze', word, cloze: { before, after, zh: word.example.zh } };
+        return { type: 'cloze', word, cloze: { before, after, zh: word.example.zh, suffix } };
       }
     }
   }
@@ -319,7 +322,7 @@ export default function ReviewPage() {
                     'mx-1 inline-block min-w-16 rounded border-b-2 px-1 text-center font-word font-bold',
                     quizCorrect ? 'border-primary text-primary' : 'border-destructive text-destructive',
                   )}>
-                    {word.word}
+                    {word.word}{question.cloze.suffix}
                   </span>
                 ) : (
                   <span aria-hidden="true" className="mx-1 inline-block w-20 border-b-2 border-primary/60 align-middle" />

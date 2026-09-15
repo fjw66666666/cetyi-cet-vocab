@@ -277,13 +277,13 @@ export default function LearnPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => { setPretestKnown(false); setStage('revealed'); }}
-              className="rounded-xl border border-destructive/40 bg-destructive/10 py-3.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 active:scale-[0.98]"
+              className="rounded-xl border border-destructive/40 bg-destructive/10 py-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/20 active:scale-[0.98]"
             >
               不认识
             </button>
             <button
               onClick={() => { setPretestKnown(true); setStage('revealed'); }}
-              className="rounded-xl border border-primary/40 bg-primary/10 py-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 active:scale-[0.98]"
+              className="rounded-xl border border-primary/40 bg-primary/10 py-4 text-sm font-medium text-primary transition-colors hover:bg-primary/20 active:scale-[0.98]"
             >
               认识
             </button>
