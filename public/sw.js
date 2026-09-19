@@ -1,5 +1,5 @@
 // 离线缓存：应用外壳 + 已加载的词库分片 + 下载文件后台缓存
-const CACHE = 'cetyi-v5';
+const CACHE = 'cetyi-v6';
 const DOWNLOAD_CACHE = 'cetyi-downloads-v1';
 const CORE = [
   './',
