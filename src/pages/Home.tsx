@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router';
-import { Flame, Headphones, Play, Sparkles, Target } from 'lucide-react';
+import { Flame, Headphones, Plane, Play, Sparkles, Target } from 'lucide-react';
 import { ProgressRing, StatCard } from '@/components/ui-bits';
 import { GlassCard } from '@/components/GlassCard';
 import { CountUp } from '@/components/CountUp';
@@ -89,6 +89,15 @@ export default function HomePage() {
             <Link to="/listen" className="flex items-center justify-center gap-2 rounded-xl border py-3 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <Headphones className="h-4 w-4" /> 随身听
             </Link>
+            <Link
+              to="/game"
+              className="flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 py-3 text-sm font-medium text-primary transition-transform active:scale-[0.98]"
+            >
+              <Plane className="h-4 w-4" /> 词战长空 · 在弹幕中记住单词
+            </Link>
+            <span className="-mt-1 px-1 text-center text-[11px] text-muted-foreground">
+              碎片时间练 3 分钟，答错不扣分只扣血
+            </span>
           </div>
         </div>
       </GlassCard>

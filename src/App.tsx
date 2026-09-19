@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router';
-import { BarChart3, BookOpenText, Home, Newspaper, Settings as SettingsIcon, Trophy } from 'lucide-react';
+import { BarChart3, BookOpenText, Home, Newspaper, Plane, Settings as SettingsIcon, Trophy } from 'lucide-react';
 import { WordsProvider } from '@/hooks/useWords';
 import { useTheme } from '@/hooks/useTheme';
 import { AuroraBackground } from '@/components/AuroraBackground';
@@ -16,6 +16,7 @@ const StatsPage = lazy(() => import('@/pages/Stats'));
 const AchievementsPage = lazy(() => import('@/pages/Achievements'));
 const LibraryPage = lazy(() => import('@/pages/Library'));
 const ReadPage = lazy(() => import('@/pages/Read'));
+const GamePage = lazy(() => import('@/pages/Game'));
 const SettingsPage = lazy(() => import('@/pages/Settings'));
 
 const NAV = [
@@ -24,13 +25,14 @@ const NAV = [
   { to: '/read', label: '阅读', icon: Newspaper },
   { to: '/stats', label: '统计', icon: BarChart3 },
   { to: '/achievements', label: '成就', icon: Trophy },
+  { to: '/game', label: '词战', icon: Plane },
   { to: '/settings', label: '设置', icon: SettingsIcon },
 ];
 
 function Shell() {
   useTheme();
   const location = useLocation();
-  const immersive = ['/learn', '/review', '/listen'].some((p) => location.pathname.startsWith(p));
+  const immersive = ['/learn', '/review', '/listen', '/game'].some((p) => location.pathname.startsWith(p));
 
   useEffect(() => startNotifyLoop(), []);
 
@@ -84,6 +86,7 @@ function Shell() {
             <Route path="/achievements" element={<AchievementsPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/read" element={<ReadPage />} />
+            <Route path="/game" element={<GamePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </div>
@@ -93,7 +96,7 @@ function Shell() {
       {/* 移动端底部标签栏 */}
       {!immersive && (
         <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t bg-background/90 backdrop-blur md:hidden">
-          <div className="grid grid-cols-6">
+          <div className="grid grid-cols-7">
             {NAV.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -107,7 +110,7 @@ function Shell() {
                 }
               >
                 <Icon className="h-5 w-5" />
-                {label}
+                <span className="w-full truncate text-center">{label}</span>
               </NavLink>
             ))}
           </div>

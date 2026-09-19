@@ -1,0 +1,172 @@
+```mermaid
+classDiagram
+    direction TB
+
+    class types_ts {
+        <<module>>
+        +GameState
+        +QuizMode
+        +WaveQuizType
+        +PlayMode
+        +Verdict
+        +DistractorSource
+        +GameOption
+        +Question
+        +Enemy
+        +Particle
+        +Ship
+        +HudSnapshot
+        +GameEvent
+        +SessionSummary
+        +WrongWordEntry
+        +WrongBook
+        +ThemeColors
+        +GameInput
+        +InputResult
+        +EngineCallbacks
+        +EngineOptions
+    }
+
+    class constants_ts {
+        <<module>>
+        +FIELD_W
+        +FIELD_H
+        +DIFFICULTY
+        +CARD
+        +WRONGBOOK_KEY
+        +GAME_WRONG_PASS_STREAK
+        +MOVE_STEP
+        +MOVE_SPEED
+        +DIGIT_KEYS
+        +ALL_TYPES
+        +FUNC_POS
+        +SHORT_BLACKLIST
+        +POOL_MIN
+        +QUIZ_MODE_LABELS
+        +CANVAS_FONT_WORD
+        +CANVAS_FONT_UI
+    }
+
+    class theme_ts {
+        <<module>>
+        +readThemeColors(el?) ThemeColors
+        +getCachedColors() ThemeColors
+        +subscribeTheme(listener) unsubscribe
+        +disposeTheme() void
+    }
+
+    class wordPool_ts {
+        <<module>>
+        +isValidGameWord(w) bool
+        +buildGamePool(map) WordEntry[]
+        +tierBandForWave(wave) Tier[]
+        +pickQuestionEntry(pool, wave, seenIds, rand) WordEntry
+    }
+
+    class distractors_ts {
+        <<module>>
+        +hasSemanticOverlap(a, b) bool
+        +parseConfusables(entry, map) WordEntry[]
+        +buildDistractors(target, pool, map, rand) Result
+        +buildQuestion(target, pool, map, quizType, lastIdx, rand) Question
+    }
+
+    class wrongbook_ts {
+        <<module>>
+        +loadWrongBook() WrongBook
+        +saveWrongBook(book) void
+        +recordWrong(book, id, word, now) WrongBook
+        +recordCorrect(book, id) WrongBook
+        +isInWrongBook(book, id) bool
+        +wrongPoolEntries(book, map) WordEntry[]
+    }
+
+    class priority_lib {
+        <<external lib/priority>>
+        +heatGrade(fs, tier) HeatGrade
+        +isHot(g) bool
+    }
+
+    class engine_ts {
+        <<module>>
+        -canvas: HTMLCanvasElement
+        -ctx: CanvasRenderingContext2D
+        -state: GameState
+        -clockMs: number
+        -speedScale: number
+        -enemies: Enemy[]
+        -particles: Particle[]
+        -ship: Ship
+        -hp: number
+        -score: number
+        -combo: number
+        -maxCombo: number
+        -wave: number
+        -seenIds: Set~string~
+        -colors: ThemeColors
+        +constructor(canvas, opts)
+        +start() void
+        +pause() void
+        +resume() void
+        +submitAnswer(index) void
+        +dispatch(input) InputResult
+        +setColors(colors) void
+        +resize(w, h) void
+        +dispose() void
+        -loop(ts) void
+        -tick(dtMs) void
+        -spawnWave() void
+        -judge(verdict) void
+        -applyDamage(fs) number
+        -openCard(verdict) void
+        -closeCard() void
+        -pushHud(force) void
+        -draw() void
+    }
+
+    class useGameWords_ts {
+        <<hook>>
+        +useGameWords(mode, wrongbook) GamePoolResult
+    }
+
+    class SkyWords_tsx {
+        <<react>>
+        -engineRef: Ref~Engine~
+        -canvasRef: Ref~HTMLCanvasElement~
+        -hud: HudSnapshot
+        -gameState: GameState
+        -activeQuestion: Question
+        -lastVerdict: Verdict
+        -summary: SessionSummary
+        +useEffect(mount)
+        +useEffect(resize)
+        +useEffect(theme)
+        +useEffect(input)
+        +render()
+    }
+
+    class Game_tsx {
+        <<page>>
+        +default GamePage()
+    }
+
+    types_ts <.. constants_ts : imports
+    types_ts <.. wordPool_ts : imports
+    types_ts <.. distractors_ts : imports
+    types_ts <.. wrongbook_ts : imports
+    types_ts <.. engine_ts : imports
+    types_ts <.. theme_ts : imports
+    constants_ts <.. engine_ts : imports
+    priority_lib <.. wordPool_ts : imports
+    priority_lib <.. distractors_ts : imports
+    wordPool_ts <.. distractors_ts : imports
+    wordPool_ts <.. engine_ts : imports
+    distractors_ts <.. engine_ts : imports
+    wordPool_ts <.. useGameWords_ts : imports
+    wrongbook_ts <.. useGameWords_ts : imports
+    engine_ts <.. SkyWords_tsx : owns
+    theme_ts <.. SkyWords_tsx : imports
+    wrongbook_ts <.. SkyWords_tsx : imports
+    useGameWords_ts <.. SkyWords_tsx : imports
+    SkyWords_tsx <.. Game_tsx : renders
+```

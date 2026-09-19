@@ -259,4 +259,16 @@
   .rotate-y-180 {
     transform: rotateY(180deg);
   }
+
+  /* ---------- 词战长空（SkyWords）专用 ---------- */
+  /* 竖屏游戏容器：9/16 比例 + 高度上限 + 触摸不滚动 */
+  .game-root {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    max-height: min(78vh, 720px);
+    overflow: hidden;
+    touch-action: none; /* 从 CSS 层阻止触摸滚动，与 JS preventDefault 双保险 */
+  }
+  /* 注：倒计时危急态与受伤闪光均由 Canvas / 引擎状态驱动（见 SkyWords.tsx 与 engine.ts），
+     无需 CSS keyframes，故此处不再新增游戏专用动画类，避免死 CSS。 */
 }

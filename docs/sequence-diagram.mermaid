@@ -1,0 +1,169 @@
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant SW as SkyWords.tsx
+    participant UB as useGameWords
+    participant W as useWords (Context)
+    participant T as theme.ts
+    participant E as Engine
+    participant C as Canvas 2D
+    participant WB as wrongbook.ts
+
+    U->>SW: 访问 #/game
+    SW->>UB: useGameWords(mode, wrongbook)
+    UB->>W: useWords()
+    W-->>UB: Map<id, WordEntry> (6667)
+    UB->>UB: useMemo → buildGamePool(map) → 6537 词
+    UB-->>SW: { pool, map, size }
+
+    SW->>WB: loadWrongBook()
+    WB-->>SW: WrongBook (损坏则 {})
+
+    SW->>T: getCachedColors() / subscribeTheme(cb)
+    T-->>SW: ThemeColors（真实色值）
+
+    SW->>E: new Engine(canvas, { pool, mode, callbacks })
+    E->>E: 初始化 hp=3, score=0, combo=0, wave=1, clockMs=0
+    SW->>E: engine.setColors(colors)
+    SW->>E: engine.start()
+    E->>E: rafId = requestAnimationFrame(loop)
+
+    loop 每帧 (~60fps)
+        E->>E: dt = min(100, ts - lastTs) * speedScale
+        E->>E: clockMs += dt
+        E->>E: 推进 enemies.y, 粒子, 战机插值
+        E->>E: 检查敌机是否抵达防线
+        alt 抵达防线（超时）
+            E->>E: judge('timeout') → applyDamage(fs) → pushHud(true)
+        end
+        E->>C: draw()（背景/星空/敌机/战机/粒子，用 cached ThemeColors）
+        E->>E: pushHud(false)（10Hz 节流，仅 timeRatio 变化）
+        E->>SW: onHud(snapshot)
+        SW->>SW: setHud(snapshot)（React 重渲染 HUD）
+        E->>E: rafId = requestAnimationFrame(loop)
+    end
+
+    Note over T,SW: 主题切换（<html>.dark 变化）
+    T-->>SW: listener(ThemeColors)
+    SW->>E: engine.setColors(colors)
+    Note over E: 下一帧 draw() 使用新色值（Canvas 与 DOM 同步）
+
+    U->>SW: 离开页面
+    SW->>E: engine.dispose()
+    E->>E: cancelAnimationFrame(rafId)
+    E->>E: arrays.length = 0
+    SW->>T: disposeTheme()
+    T->>T: observer.disconnect()
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant E as Engine
+    participant WP as wordPool.ts
+    participant D as distractors.ts
+    participant P as priority.ts
+    participant U as 用户
+    participant SW as SkyWords.tsx
+    participant WB as wrongbook.ts
+
+    Note over E: 波次开始（wave=N，敌机数 = min(8, 3+floor(N/2))）
+    E->>E: spawnWave() → 计算 speed/timeLimit
+    loop 每架敌机（各自独立一题）
+        E->>WP: pickQuestionEntry(pool, wave, seenIds, rand)
+        WP->>P: heatGrade(fs,tier) / isHot(g)
+        P-->>WP: HeatGrade
+        WP-->>E: target: WordEntry
+        E->>E: 确定 quizType（mix 模式下轮换，避免连续同型）
+        E->>D: buildQuestion(target, pool, map, quizType, lastCorrectIndex, rand)
+        D->>D: buildDistractors() 走 5 级降级链
+        D->>D: hasSemanticOverlap() 过滤（每级都做）
+        D->>P: isHot() 排序（高频优先）
+        D->>D: shuffle 选项 + 保证 correctIndex ≠ lastCorrectIndex
+        alt 干扰项 < 1
+            D-->>E: 返回 null → E 换词重选
+        else 干扰项 ≥ 1
+            D-->>E: Question { options, correctIndex, source }
+        end
+        E->>E: 生成 Enemy（x, y=0, vy=speed, question）
+        E->>E: seenIds.add(target.id)
+        E->>SW: onEvent({ type:'question', question })
+        SW->>SW: setActiveQuestion(question)（弹药区渲染 4 选项）
+        alt quizType === 'listen'
+            E->>E: speak(word, voice)（自动播一次）
+        end
+
+        Note over U,E: 作答窗口 = timeLimit（8s − 0.25s/波，下限 4s）
+        alt 用户作答
+            U->>SW: 点击弹药 / 键盘 1-4
+            SW->>E: dispatch({ kind:'answer', index })
+            E->>E: 校验 state==='playing' → 判定
+        else 超时
+            E->>E: 敌机 y ≥ 防线 → judge('timeout')
+        end
+
+        E->>E: judge(verdict)
+        alt verdict === 'correct'
+            E->>E: score += 100 * min(3, 1+0.1*combo)
+            E->>E: combo += 1, maxCombo = max, correctStreak += 1
+            E->>E: 敌机 state='bursting'（粒子爆炸）
+            opt 该词在游戏错词本中
+                E->>WB: recordCorrect(book, id)
+                Note over WB: correctStreak≥2 → 删除条目
+            end
+        else verdict === 'wrong' | 'timeout'
+            E->>E: applyDamage(fs) → damage = clamp(Math.round(1+2*fs/100),1,3)
+            E->>E: hp = max(0, hp - damage), combo = 0
+            E->>E: 敌机突进至防线并闪光
+            E->>WB: recordWrong(book, id, word, now)
+            Note over WB: wrongCount+=1, correctStreak=0, lastWrongAt=now
+        end
+
+        E->>SW: onEvent({ type:'verdict', verdict, question, damage, correctIndex })
+        SW->>SW: setLastVerdict(...)（弹药区高亮：绿+✓+文字 / 红+✕+文字）
+        E->>E: openCard(verdict) → state='card'
+        E->>SW: onEvent({ type:'state', state:'card' })
+        SW->>SW: 渲染强化卡（SpeakerButton / example / mnemonic 缺失则不渲染对应块）
+        E->>E: pushHud(true)（hp/score/combo 已变）
+
+        Note over E: 强化卡停留：对 0.8s / 错 1.2s（clockMs 累加）
+        U->>SW: 可选：点「记一下」→ dispatch({kind:'extend'}) → clockMs 冻结
+        U->>SW: 可选：点「继续」/ 按键 → dispatch({kind:'continue'}) → clockMs 恢复
+        E->>E: 卡片计时到期 → closeCard() → state='playing'
+        E->>SW: onEvent({ type:'card-closed', verdict, question })
+        SW->>SW: 清理高亮态，setActiveQuestion(null)
+
+        alt hp === 0
+            E->>E: state='over' → 汇总 SessionSummary
+            E->>SW: onEvent({ type:'gameover', summary })
+            SW->>SW: 渲染结束面板（StatCard / CountUp / 待巩固单词）
+        else hp > 0
+            Note over E: 继续下一架敌机（或下一波）
+        end
+    end
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as 浏览器/用户
+    participant SW as SkyWords.tsx
+    participant E as Engine
+
+    B->>SW: document 触发 visibilitychange（切后台）
+    SW->>E: dispatch({ kind:'pause' })
+    E->>E: state='paused'，speedScale=0（clockMs 停止累加）
+    E->>SW: onEvent({ type:'state', state:'paused' }) + pushHud(true)
+    SW->>SW: 渲染暂停遮罩（继续 / 退出）
+
+    B->>SW: 切回前台，点击「继续」
+    SW->>E: dispatch({ kind:'resume' })
+    E->>E: state='playing'，speedScale=1，lastTs=performance.now()
+    Note over E: ⚠️ 恢复时不补扣时间（lastTs 重置，dt 从 0 起算）
+    E->>SW: onEvent({ type:'state', state:'playing' }) + pushHud(true)
+
+    B->>SW: 鼠标移出 canvas（mouseleave）
+    SW->>E: dispatch({ kind:'pause' })
+    Note over E: 同切后台流程（但仅在 state==='playing' 时生效）
+```
